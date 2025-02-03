@@ -1,3 +1,3 @@
 # Thesis
-# Just setting everything up.
-# Harris was here
+## Just setting everything up.
+### Harris was here
