@@ -172,3 +172,6 @@ cython_debug/
 
 # Datafiles
 data/
+
+#Extra
+.DS_Store
