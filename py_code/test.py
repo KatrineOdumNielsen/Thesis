@@ -1,11 +1,7 @@
 import pandas as pd
 
-data = {
-  "calories": [420, 380, 390],
-  "duration": [50, 40, 45]
-}
+# Read the CSV file
+bond_return_data = pd.read_csv("thesis/data/raw/bond_returns.csv")
 
-#load data into a DataFrame object:
-df = pd.DataFrame(data)
-
-print(df)
+# View the first 5 rows
+bond_return_data()
