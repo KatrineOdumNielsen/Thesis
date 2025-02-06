@@ -1,4 +1,5 @@
 #Husk de her koder:
+#git pull
 #git add .
 #git commit -m "hvad du har gjort"
 #git push
@@ -57,8 +58,6 @@ plt.figure(figsize=(10, 6))
 sns.boxplot(data=bond_return_data, x='duration')
 plt.title('Boxplot of duration')
 plt.show()
-
-#JEG TESTER DATA 
 
 plt.figure(figsize=(10, 6))
 sns.boxplot(data=bond_return_data, x='rating_group')
