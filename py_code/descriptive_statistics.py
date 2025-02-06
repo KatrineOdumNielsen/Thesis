@@ -1,3 +1,8 @@
+#Husk de her koder:
+#git add .
+#git commit -m "hvad du har gjort"
+#git push
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -34,7 +39,7 @@ plt.show()
 
 ## Runnning excess return without outliers
 plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='ret_exc', snowfliers=False)
+sns.boxplot(data=bond_return_data, x='ret_exc', showliers=False)
 plt.title('Boxplot of excess return')
 plt.show()
 
@@ -52,6 +57,8 @@ plt.figure(figsize=(10, 6))
 sns.boxplot(data=bond_return_data, x='duration')
 plt.title('Boxplot of duration')
 plt.show()
+
+#JEG TESTER DATA 
 
 plt.figure(figsize=(10, 6))
 sns.boxplot(data=bond_return_data, x='rating_group')
