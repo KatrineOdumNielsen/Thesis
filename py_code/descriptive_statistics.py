@@ -121,7 +121,7 @@ DI = bond_data[bond_data['rating_num'] >= 18.5]
 IG_stats = IG.describe()
 HY_stats = HY.describe()
 DI_stats = DI.describe()
-IG_stats.to_csv("data/other/investment_grade_summary_statistics.csv")
-HY_stats.to_csv("data/other/summary_statistics.csv")
-DI.to_csv("data/other/summary_statistics.csv")
+IG_stats.to_csv("data/other/IG_summary_statistics.csv")
+HY_stats.to_csv("data/other/HY_summary_statistics.csv")
+DI_stats.to_csv("data/other/DI_summary_statistics.csv")
 
