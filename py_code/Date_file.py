@@ -1,43 +1,25 @@
 #Set up directory
 import os
-
-
-
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
 print("This is my current directory:\n")
 print(os.getcwd())
 print(os.getcwd()+"/data")
 
-# In[3]:
-
 
 import sys
 sys.path.insert(0,os.getcwd())
-
-
-# In[5]:
-
-
-# numpy for working with matrices, etc. 
 import numpy as np
-
-# import pandas
 import pandas as pd
-
-# import tabulate for tables
 #from tabulate import tabulate
-
-# plotting libraries
 import matplotlib.pyplot as plt
 #import seaborn as sns
 
 
-# In[27]:
-
-
 #Importing data
+print("importing data")
 Data = pd.read_csv(data_folder + "/raw/bond_returns.csv")
+Data.rename(columns={"cusip": "COMPLETE_CUSIP"}, inplace=True)
 Data['eom'] = pd.to_datetime(Data['eom'])
 Ratings = pd.read_csv(data_folder + "/raw/rating_data.csv")
 Ratings['RATING_DATE'] = pd.to_datetime(Ratings['RATING_DATE'])
@@ -68,8 +50,19 @@ rating_map = {
 #Nummerical ratings
 Ratings['NUMERICAL_RATING'] = Ratings['RATING'].map(rating_map)
 
+# Creating separate DataFrames for each rating type
+ratings_FR = Ratings[Ratings['RATING_TYPE'] == 'FR']
+ratings_MR = Ratings[Ratings['RATING_TYPE'] == 'MR']
+ratings_SR = Ratings[Ratings['RATING_TYPE'] == 'SPR']
+
+# Create a new column in Data to store the average rating
+Data['num_ratings_FR'] = np.nan
+Data['num_ratings_MR'] = np.nan
+Data['num_ratings_SR'] = np.nan
+
+print("looking up latest rating")
 # Function to look up the latest rating for a given COMPLETE_CUSIP
-def get_average_latest_rating_for_cusip(ratings_df, date, cusip):
+def get_latest_rating_for_cusip(ratings_df, date, cusip):
     # Filter the DataFrame for the specific COMPLETE_CUSIP
     cusip_ratings_df = ratings_df[ratings_df['COMPLETE_CUSIP'] == cusip]
     
@@ -90,52 +83,33 @@ def get_average_latest_rating_for_cusip(ratings_df, date, cusip):
         return None
     
     # Get the latest rating for each rating agency
-    latest_ratings = cusip_ratings_df.groupby('RATING_TYPE').last().reset_index()
-    
-    # Calculate the average numerical rating
-    average_rating = latest_ratings['NUMERICAL_RATING'].mean()
-    
-    return average_rating
+    latest_ratings = cusip_ratings_df.iloc[-1].reset_index()
 
-func_test = get_average_latest_rating_for_cusip(Ratings, "2003-06-14", "37042GUT1")
+    return latest_ratings
+
+func_test = get_latest_rating_for_cusip(ratings_FR, "2003-06-14", "37042GUT1")
 print(func_test)
 
-Ratings.head()
+Data = Data[0:50]
 
 
-# In[50]:
-
-
-Data = Data[0:100]
-
-
-# In[52]:
-
-
-def get_rating_for_row(row):
-    cusip = row['cusip']
+print("merging ratings to return dataset")
+def get_rating_for_row(row, rating_type):
+    cusip = row['COMPLETE_CUSIP']
     date = row['eom']
-    average_rating = get_average_latest_rating_for_cusip(Ratings, date, cusip)
-    return average_rating
+    rating = get_latest_rating_for_cusip(rating_type, date, cusip)
+    return rating
 
 # Apply the function
-Data['average_rating'] = Data.apply(get_rating_for_row, axis=1)
-
-# --- Step 4: Review Results ---
-
-Data.head()
-
-
-# In[61]:
-
+Data['num_ratings_FR'] = Data.apply(lambda row: get_rating_for_row(row, ratings_FR), axis=1)
+print("showing ratings.fr")
+print(Data.head())
 
 #Load price data
 Prices = pd.read_csv(data_folder + "/raw/bond_prices.csv")
 Prices['eom'] = pd.to_datetime(Prices['DATE'])
 Prices.head()
 
-
-# In[109]:
 
 
 #Function to find price
@@ -159,17 +133,16 @@ def get_price_given_cusip(prices_df, date, cusip):
 get_price_given_cusip(Prices,'2022-07-31','00036AAB17')
 
 
-# In[77]:
-
-
 # Apply the function to each row in Data
+print("merging prices with return dataset")
 Data['price_eom'] = Data.apply(
     lambda row: get_price_given_cusip(Prices, row['eom'], row['cusip']), axis=1
 )
 
 Data.head()
 
-Data.to_csv(data_folder + "/processed/bond_returns_with_ratings.csv")
+print("exporting data")
+Data.to_csv(data_folder + "/preprocessed/bond_returns_with_ratings.csv")
 
 # In[137]:
 

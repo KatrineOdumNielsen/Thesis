@@ -4,12 +4,17 @@
 #git commit -m "hvad du har gjort"
 #git push
 
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+#Set the working directory
+project_dir = os.getcwd()   # Change to your project directory
+data_folder = project_dir + "/data"
+
 # Read the CSV file
-bond_return_data = pd.read_csv("data/raw/bond_returns.csv")
+bond_return_data = pd.read_csv("data/raw/final_bond_data.csv")
 
 print("Checking that it is in a dataframe format:")
 print(type(bond_return_data))
@@ -23,7 +28,11 @@ print(bond_return_data["eom"])
 
 #Load descriptive statistics
 print("Descriptive statistics:")
-print(bond_return_data.describe())
+summary_stats = bond_return_data.describe()
+print(summary_stats)
+
+# Save the summary statistics to a CSV file
+summary_stats.to_csv("data/summary_statistics.csv")
 
 # Visualize summary statistics using seaborn
 plt.figure(figsize=(10, 6))
