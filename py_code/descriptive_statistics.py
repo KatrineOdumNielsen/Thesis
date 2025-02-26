@@ -14,7 +14,7 @@ project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
 
 # Read the CSV file
-bond_return_data = pd.read_csv("data/raw/final_bond_data.csv")
+bond_return_data = pd.read_csv("data/preprocessed/final_bond_data.csv")
 
 print("Checking that it is in a dataframe format:")
 print(type(bond_return_data))
@@ -32,45 +32,26 @@ summary_stats = bond_return_data.describe()
 print(summary_stats)
 
 # Save the summary statistics to a CSV file
-summary_stats.to_csv("data/summary_statistics.csv")
+summary_stats.to_csv("data/other/summary_statistics.csv")
+
+# Divide into groups based on the rating type
+investment_grade = final_bond_data[final_bond_data['average_numerical_rating'] < 10.5]
+high_yield = final_bond_data[final_bond_data['average_numerical_rating'] >= 10.5]
+distressed = final_bond_data[final_bond_data['average_numerical_rating'] >= 18.5]
+
+# descriptive statistics for each group
+investment_grade_stats = investment_grade.describe()
+high_yield_stats = high_yield.describe()
+distressed_stats = distressed.describe()
+investment_grade_stats.to_csv("data/other/investment_grade_summary_statistics.csv")
+high_yield_stats.to_csv("data/other/summary_statistics.csv")
+distressed_stats.to_csv("data/other/summary_statistics.csv")
 
 # Visualize summary statistics using seaborn
 plt.figure(figsize=(10, 6))
 sns.boxplot(data=bond_return_data, x='market_value')
 plt.title('Boxplot of market value')
 plt.xlabel('Market Value (Billion USD)')
-plt.show()
-
-## Runnning excess return with outliers
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='ret_exc')
-plt.title('Boxplot of excess return')
-plt.show()
-
-## Runnning excess return without outliers
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='ret_exc', showliers=False)
-plt.title('Boxplot of excess return')
-plt.show()
-
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='ret_texc')
-plt.title('Boxplot of total excess return')
-plt.show()
-
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='yield')
-plt.title('Boxplot of yield')
-plt.show()
-
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='duration')
-plt.title('Boxplot of duration')
-plt.show()
-
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=bond_return_data, x='rating_group')
-plt.title('Boxplot of rating group')
 plt.show()
 
 #Create initial diagrams
