@@ -1,3 +1,7 @@
+import pandas as pd
+import numpy as np
+
+#Get interpolated Treasury yield for a given maturity on a specific date.
 def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
     """
     Get interpolated Treasury yield for a given maturity on a specific date.
