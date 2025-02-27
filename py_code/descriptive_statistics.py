@@ -151,7 +151,7 @@ DI_stats.to_csv("data/other/DI_summary_statistics.csv")
 dates = sorted(bond_data['eom'].unique())
 
 # Define the groups we want to analyze:
-groups = ['IG', 'HY']
+groups = ['0.IG', '1.HY']
 # And we want to show cumulative returns for distressed bonds separately as well.
 # For DI, we use only the bonds flagged as distressed.
 # We'll calculate three series: IG, HY (all HY bonds) and DI (distressed subset).
@@ -168,7 +168,7 @@ for dt in dates:
     
     # For each group (IG and HY), compute the market-weighted return.
     for grp in groups:
-        group_data = current_period[current_period['group'] == grp]
+        group_data = current_period[current_period['rating_class'] == grp]
         total_mv = group_data['market_value'].sum()
         
         if len(group_data) > 0 and total_mv > 0:
@@ -192,7 +192,7 @@ for dt in dates:
 # Convert the dictionaries into DataFrames for further analysis.
 # Build a DataFrame for monthly returns using the computed lists.
 returns_df = pd.DataFrame(group_returns, index=date_series)
-returns_df['DI'] = di_returns
+returns_df['2.DI'] = di_returns
 returns_df.index.name = 'date'
 returns_df.reset_index(inplace=True)
 returns_df.set_index('date', inplace=True)
@@ -205,7 +205,7 @@ cumulative_df = 100 * cumulative_df
 # Combine Monthly Returns and Cumulative Returns in One DataFrame
 monthly_df = returns_df.reset_index()
 cum_df = cumulative_df.reset_index()
-cum_df = cum_df.rename(columns={'IG': 'IG_cum', 'HY': 'HY_cum', 'DI': 'DI_cum'})
+cum_df = cum_df.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
 
 # Merge the two DataFrames on 'date'
 combined_df = pd.merge(monthly_df, cum_df, on='date')
@@ -217,7 +217,7 @@ print("Combined monthly and cumulative returns saved to:", output_path)
 
 # Plot the Cumulative Returns
 #plt.figure(figsize=(12, 6))
-#for col in ['IG_cum', 'HY_cum', 'DI_cum']:
+#for col in ['IG_cum', 'HY_cum', 'DI_cum']:   #includes distressed bonds
 #    plt.plot(cum_df['date'], cum_df[col], label=col)
 #plt.title("Market-Weighted Cumulative Returns by Rating Group")
 #plt.xlabel("Date")
@@ -227,34 +227,11 @@ print("Combined monthly and cumulative returns saved to:", output_path)
 #plt.tight_layout()
 #plt.show()
 
-plt.figure(figsize=(12, 6))
-for col in ['IG_cum', 'HY_cum']:
-    plt.plot(cum_df['date'], cum_df[col], label=col)
-plt.title("Market-Weighted Cumulative Returns by Rating Group")
-plt.xlabel("Date")
-plt.ylabel("Cumulative Return Index")
-plt.legend()
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
-
-
-# Plot monthly returns
-plt.figure(figsize=(12,6))
-for col in ['IG', 'HY', 'DI']:
-    plt.plot(returns_df.index, returns_df[col], label=col, linestyle='-')
-
-plt.title("Monthly Market-Weighted Simple Returns by Rating Group")
-plt.xlabel("Date")
-plt.ylabel("Monthly Return")
-plt.legend()
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
-
 print("done")
 
-#### USING RET_TEXC INSTEAD OF RET_EXC ########################################
+
+
+############################ USING RET_TEXC INSTEAD OF RET_EXC ########################################
 
 
 
@@ -265,7 +242,7 @@ dates = sorted(bond_data['eom'].unique())
 date_series_texc = []  # To store the dates for which we compute returns
 
 # Define the groups for which we compute returns.
-groups = ['IG', 'HY']  # Distressed bonds (DI) will be computed separately.
+groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
 
 # Initialize dictionaries/lists to store returns.
 group_returns_texc = {grp: [] for grp in groups}
@@ -279,7 +256,7 @@ for dt in dates:
     
     # For each group (IG and HY), compute the market-weighted return using ret_texc.
     for grp in groups:
-        group_data_texc = current_period[current_period['group'] == grp]
+        group_data_texc = current_period[current_period['rating_class'] == grp]
         total_mv = group_data_texc['market_value'].sum()
         if len(group_data_texc) > 0 and total_mv > 0:
             weights = group_data_texc['market_value'] / total_mv
@@ -303,7 +280,7 @@ for dt in dates:
 # -------------------------------
 # Create a DataFrame for monthly returns using the computed lists.
 returns_df_texc = pd.DataFrame(group_returns_texc, index=date_series_texc)
-returns_df_texc['DI'] = di_returns_texc
+returns_df_texc['2.DI'] = di_returns_texc
 returns_df_texc.index.name = 'date'
 returns_df_texc.reset_index(inplace=True)
 returns_df_texc.set_index('date', inplace=True)
@@ -320,7 +297,7 @@ monthly_df_texc = returns_df_texc.reset_index()
 cum_df_texc = cumulative_df_texc.reset_index()
 
 # Rename cumulative columns to avoid collision.
-cum_df_texc = cum_df_texc.rename(columns={'IG': 'IG_cum', 'HY': 'HY_cum', 'DI': 'DI_cum'})
+cum_df_texc = cum_df_texc.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
 
 # Merge the two DataFrames on 'date'
 combined_df_texc = pd.merge(monthly_df_texc, cum_df_texc, on='date')
@@ -350,7 +327,7 @@ plt.show()
 # 8. Plot Monthly (Simple) Returns
 # -------------------------------
 plt.figure(figsize=(12, 6))
-for col in ['IG', 'HY', 'DI']:
+for col in ['0.IG', '1.HY', '2.DI']:
     plt.plot(returns_df_texc.index, returns_df_texc[col], label=col, linestyle='-')
 plt.title("Monthly Market-Weighted Simple Returns by Rating Group (ret_texc)")
 plt.xlabel("Date")
