@@ -248,46 +248,32 @@ groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
 group_returns = {grp: [] for grp in groups}
 di_returns = []  # For distressed bonds
 
-# Loop over each month, starting from the second period
-for i in range(1, len(dates)):
-    dt = dates[i]
-    prev_dt = dates[i - 1]  # Previous month
-
+# Loop over each month (each date)
+for dt in dates:
     date_series.append(dt)
     current_period = bond_data[bond_data['eom'] == dt]
-    prev_period = bond_data[bond_data['eom'] == prev_dt]
-
-    # For each group (IG and HY), compute the market-weighted return using prior period's weights
+    
+    # For each group (IG and HY), compute the market-weighted return.
     for grp in groups:
-        current_group_data = current_period[current_period['rating_class'] == grp]
-        prev_group_data = prev_period[prev_period['rating_class'] == grp]
-
-        # Get previous month's market values
-        prev_mv = prev_group_data.set_index('cusip')['market_value'] if not prev_group_data.empty else pd.Series(dtype=float)
-
-        # Compute weights using previous month's market values
-        total_prev_mv = prev_mv.sum()
-        if not prev_mv.empty and total_prev_mv > 0:
-            weights = prev_mv / total_prev_mv
-            weighted_return = (weights * current_group_data.set_index('cusip')['ret']).sum()  
+        group_data = current_period[current_period['rating_class'] == grp]
+        total_mv = group_data['market_value_past'].sum()
+        
+        if len(group_data) > 0 and total_mv > 0:
+            weights = group_data['market_value_past'] / total_mv
+            weighted_return = (weights * group_data['ret']).sum()
         else:
             weighted_return = 0
-
-        group_returns[grp].append(weighted_return) 
-
-    # For distressed bonds: select only rows where is_distressed == True
-    current_distressed_data = current_period[current_period['distressed_rating'] == True]
-    prev_distressed_data = prev_period[prev_period['distressed_rating'] == True]
-
-    prev_mv_di = prev_distressed_data.set_index('cusip')['market_value'] if not prev_distressed_data.empty else pd.Series(dtype=float)
-
-    total_prev_mv_di = prev_mv_di.sum()
-    if not prev_mv_di.empty and total_prev_mv_di > 0:
-        weights_di = prev_mv_di / total_prev_mv_di
-        weighted_return_di = (weights_di * current_distressed_data.set_index('cusip')['ret']).sum()  
+        
+        group_returns[grp].append(weighted_return)
+    
+    # For distressed bonds: subset of HY where is_distressed == True.
+    distressed_data = current_period[current_period['distressed_rating'] == True]
+    total_mv_di = distressed_data['market_value_past'].sum()
+    if len(distressed_data) > 0 and total_mv_di > 0:
+        weights_di = distressed_data['market_value_past'] / total_mv_di
+        weighted_return_di = (weights_di * distressed_data['ret']).sum()
     else:
         weighted_return_di = 0
-
     di_returns.append(weighted_return_di)
 
 

@@ -138,11 +138,21 @@ bond_data_large = bond_data_large.dropna(subset=['rating_num'])
 bond_data_large = bond_data_large.dropna(subset=['ret_exc'])
 bond_data_large = bond_data_large.dropna(subset=['yield'])
 bond_data_large = bond_data_large.dropna(subset=['amount_outstanding'])
+
 # Adding definitions of distress
 bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 17.5
 bond_data['distressed_rating'] = bond_data['rating_num'] > 17.5
 bond_data_large['distressed_spread'] = bond_data_large['credit_spread'] > 0.1
 bond_data['distressed_spread'] = bond_data['credit_spread'] > 0.1
+
+#Adding market value of last period
+bond_data_large = bond_data_large.sort_values(by=['cusip', 'eom'])
+bond_data_large['market_value_past'] = bond_data_large.groupby('cusip')['market_value'].shift(1)
+bond_data_large['market_value_past'] = bond_data_large['market_value_past'].fillna(bond_data_large['market_value'] / (1 + bond_data_large['ret']))
+bond_data = bond_data.sort_values(by=['cusip', 'eom'])
+bond_data['market_value_past'] = bond_data.groupby('cusip')['market_value'].shift(1)
+bond_data['market_value_past'] = bond_data['market_value_past'].fillna(bond_data['market_value'] / (1 + bond_data['ret']))
+
 
 # Save the data
 bond_data.to_csv("data/preprocessed/bond_data.csv")
