@@ -42,7 +42,7 @@ bond_return_data = bond_return_data.merge(
     yield_curve[['1M']], left_on='eom', right_index=True, how='left'
 ) # adds yield data
 bond_return_data.rename(columns={'1M': 't_bill_1m'}, inplace=True) # rename for clarity
-bond_return_data['ret'] = bond_return_data['ret_exc'] + bond_return_data['t_bill_1m'] # calculate total return
+bond_return_data['ret'] = bond_return_data['ret_exc'] + (1 + bond_return_data['t_bill_1m']) ** (1/12) - 1 # calculate total return
 
 # Load WRDS data
 wrds_data = pd.read_csv(data_folder + "/raw/all_wrds_data.csv")
@@ -75,7 +75,7 @@ bond_additional_data_subset = bond_additional_data_subset.merge(
 bond_additional_data_subset.rename(columns={'1M': 't_bill_1m'}, inplace=True) # rename for clarity
 bond_additional_data_subset['yield'] = bond_additional_data_subset['wrds_yield']
 bond_additional_data_subset['ret'] = bond_additional_data_subset['ret_eom']
-bond_additional_data_subset['ret_exc'] = bond_additional_data_subset['ret'] - bond_additional_data_subset['t_bill_1m'] # excess return
+bond_additional_data_subset['ret_exc'] = bond_additional_data_subset['ret'] - (1 + bond_additional_data_subset['t_bill_1m']) ** (1/12) - 1 # excess return
 bond_additional_data_subset['ret_texc'] = bond_additional_data_subset['ret_exc'] # REQUIRED TO MERGE - IS NOT ACTUALLY CALCULATED CORRECTLY
 bond_additional_data_subset['market_value'] = bond_additional_data_subset['amount_outstanding'] * bond_additional_data_subset['price_eom'] * 10 # MV is NOT in '000s
 bond_additional_data_subset = bond_additional_data_subset[bond_data.columns]
@@ -133,10 +133,18 @@ bond_data["interp_yield"] = bond_data.apply(
 )
 bond_data["credit_spread"] = bond_data['yield'] - bond_data['interp_yield']
 
-# Remove observations with no rating / return / yield
+# Remove observations with no rating / return / yield / amount outstanding
 bond_data_large = bond_data_large.dropna(subset=['rating_num'])
 bond_data_large = bond_data_large.dropna(subset=['ret_exc'])
 bond_data_large = bond_data_large.dropna(subset=['yield'])
-print("done")
+bond_data_large = bond_data_large.dropna(subset=['amount_outstanding'])
+# Adding definitions of distress
+bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 17.5
+bond_data['distressed_rating'] = bond_data['rating_num'] > 17.5
+bond_data_large['distressed_spread'] = bond_data_large['credit_spread'] > 0.1
+bond_data['distressed_spread'] = bond_data['credit_spread'] > 0.1
+
+# Save the data
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
+print("done")

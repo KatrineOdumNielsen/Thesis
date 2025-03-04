@@ -133,7 +133,7 @@ plt.show()
 # Divide into groups based on the rating type
 IG = bond_data[bond_data['rating_num'] < 10.5]
 HY = bond_data[bond_data['rating_num'] >= 10.5]
-DI = bond_data[bond_data['rating_num'] >= 18.5]
+DI = bond_data[bond_data['rating_num'] >= 17.5]
 
 # descriptive statistics for each group
 IG_stats = IG.describe()
@@ -180,7 +180,7 @@ for dt in dates:
         group_returns[grp].append(weighted_return)
     
     # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed'] == True]
+    distressed_data = current_period[current_period['distressed_rating'] == True]
     total_mv_di = distressed_data['market_value'].sum()
     if len(distressed_data) > 0 and total_mv_di > 0:
         weights_di = distressed_data['market_value'] / total_mv_di
@@ -231,91 +231,107 @@ print("done")
 
 
 
-############################ USING RET_TEXC INSTEAD OF RET_EXC ########################################
+############################ USING RET ########################################
 
 
 
-# 3. Compute Monthly Market-Weighted Returns Using ret_texc
+# 3. Compute Monthly Market-Weighted Returns Using ret
 # -------------------------------
-# Get the sorted unique month-end dates.
+# Get sorted unique month-end dates
 dates = sorted(bond_data['eom'].unique())
-date_series_texc = []  # To store the dates for which we compute returns
+date_series = []  # Store the dates for which we compute returns
 
-# Define the groups for which we compute returns.
+# Define the groups for which we compute returns
 groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
 
-# Initialize dictionaries/lists to store returns.
-group_returns_texc = {grp: [] for grp in groups}
-di_returns_texc = []  # For distressed bonds
+# Initialize dictionaries/lists to store returns
+group_returns = {grp: [] for grp in groups}
+di_returns = []  # For distressed bonds
 
-# Loop over each month
-for dt in dates:
-    date_series_texc.append(dt)
-    # Filter data for the current month.
+# Loop over each month, starting from the second period
+for i in range(1, len(dates)):
+    dt = dates[i]
+    prev_dt = dates[i - 1]  # Previous month
+
+    date_series.append(dt)
     current_period = bond_data[bond_data['eom'] == dt]
-    
-    # For each group (IG and HY), compute the market-weighted return using ret_texc.
+    prev_period = bond_data[bond_data['eom'] == prev_dt]
+
+    # For each group (IG and HY), compute the market-weighted return using prior period's weights
     for grp in groups:
-        group_data_texc = current_period[current_period['rating_class'] == grp]
-        total_mv = group_data_texc['market_value'].sum()
-        if len(group_data_texc) > 0 and total_mv > 0:
-            weights = group_data_texc['market_value'] / total_mv
-            weighted_return_texc = (weights * group_data_texc['ret_texc']).sum()
+        current_group_data = current_period[current_period['rating_class'] == grp]
+        prev_group_data = prev_period[prev_period['rating_class'] == grp]
+
+        # Get previous month's market values
+        prev_mv = prev_group_data.set_index('cusip')['market_value'] if not prev_group_data.empty else pd.Series(dtype=float)
+
+        # Compute weights using previous month's market values
+        total_prev_mv = prev_mv.sum()
+        if not prev_mv.empty and total_prev_mv > 0:
+            weights = prev_mv / total_prev_mv
+            weighted_return = (weights * current_group_data.set_index('cusip')['ret']).sum()  
         else:
-            weighted_return_texc = 0
-        group_returns_texc[grp].append(weighted_return_texc)
-    
-    # For distressed bonds: select only rows where is_distressed == True.
-    distressed_data_texc = current_period[current_period['distressed'] == True]
-    total_mv_di = distressed_data_texc['market_value'].sum()
-    if len(distressed_data_texc) > 0 and total_mv_di > 0:
-        weights_di = distressed_data_texc['market_value'] / total_mv_di
-        weighted_return_di_texc = (weights_di * distressed_data_texc['ret_texc']).sum()
+            weighted_return = 0
+
+        group_returns[grp].append(weighted_return) 
+
+    # For distressed bonds: select only rows where is_distressed == True
+    current_distressed_data = current_period[current_period['distressed_rating'] == True]
+    prev_distressed_data = prev_period[prev_period['distressed_rating'] == True]
+
+    prev_mv_di = prev_distressed_data.set_index('cusip')['market_value'] if not prev_distressed_data.empty else pd.Series(dtype=float)
+
+    total_prev_mv_di = prev_mv_di.sum()
+    if not prev_mv_di.empty and total_prev_mv_di > 0:
+        weights_di = prev_mv_di / total_prev_mv_di
+        weighted_return_di = (weights_di * current_distressed_data.set_index('cusip')['ret']).sum()  
     else:
-        weighted_return_di_texc = 0
-    di_returns_texc.append(weighted_return_di_texc)
+        weighted_return_di = 0
+
+    di_returns.append(weighted_return_di)
+
 
 # -------------------------------
 # 4. Create DataFrames for Returns
 # -------------------------------
 # Create a DataFrame for monthly returns using the computed lists.
-returns_df_texc = pd.DataFrame(group_returns_texc, index=date_series_texc)
-returns_df_texc['2.DI'] = di_returns_texc
-returns_df_texc.index.name = 'date'
-returns_df_texc.reset_index(inplace=True)
-returns_df_texc.set_index('date', inplace=True)
+returns_df = pd.DataFrame(group_returns, index=date_series)  
+returns_df['2.DI'] = di_returns 
+returns_df.index.name = 'date'
+returns_df.reset_index(inplace=True)
+returns_df.set_index('date', inplace=True)
 
 # Compute cumulative returns: cumulative product of (1 + monthly_return).
-cumulative_df_texc = (1 + returns_df_texc).cumprod()
+cumulative_df = (1 + returns_df).cumprod()  
 # Multiply by 100 if you want an index starting at 100.
-cumulative_df_texc = 100 * cumulative_df_texc
+cumulative_df = 100 * cumulative_df 
 
 # -------------------------------
 # 5. Combine Monthly and Cumulative Returns
 # -------------------------------
-monthly_df_texc = returns_df_texc.reset_index()
-cum_df_texc = cumulative_df_texc.reset_index()
+monthly_df = returns_df.reset_index()
+cum_df = cumulative_df.reset_index()
 
 # Rename cumulative columns to avoid collision.
-cum_df_texc = cum_df_texc.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
+cum_df = cum_df.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
 
 # Merge the two DataFrames on 'date'
-combined_df_texc = pd.merge(monthly_df_texc, cum_df_texc, on='date')
+combined_df = pd.merge(monthly_df, cum_df, on='date')
 
 # -------------------------------
 # 6. Save Combined DataFrame to CSV
 # -------------------------------
-output_path_texc = os.path.join(data_folder, "preprocessed", "market_returns_combined_texc.csv")
-combined_df_texc.to_csv(output_path_texc, index=False)
-print("Combined monthly and cumulative returns saved to:", output_path_texc)
+output_path = os.path.join(data_folder, "preprocessed", "market_returns_combined.csv") 
+combined_df.to_csv(output_path, index=False) 
+print("Combined monthly and cumulative returns saved to:", output_path)
 
 # -------------------------------
 # 7. Plot Cumulative Returns
 # -------------------------------
 plt.figure(figsize=(12, 6))
 for col in ['IG_cum', 'HY_cum', 'DI_cum']:
-    plt.plot(cum_df_texc['date'], cum_df_texc[col], label=col)
-plt.title("Market-Weighted Cumulative Returns by Rating Group (ret_texc)")
+    plt.plot(cum_df['date'], cum_df[col], label=col)
+plt.title("Market-Weighted Cumulative Returns by Rating Group (ret)")
 plt.xlabel("Date")
 plt.ylabel("Cumulative Return Index")
 plt.legend()
@@ -328,8 +344,8 @@ plt.show()
 # -------------------------------
 plt.figure(figsize=(12, 6))
 for col in ['0.IG', '1.HY', '2.DI']:
-    plt.plot(returns_df_texc.index, returns_df_texc[col], label=col, linestyle='-')
-plt.title("Monthly Market-Weighted Simple Returns by Rating Group (ret_texc)")
+    plt.plot(returns_df.index, returns_df[col], label=col, linestyle='-')
+plt.title("Monthly Market-Weighted Simple Returns by Rating Group (ret)")
 plt.xlabel("Date")
 plt.ylabel("Monthly Return")
 plt.legend()
