@@ -23,6 +23,7 @@ data_folder = project_dir + "/data"
 
 # Read the CSV file
 bond_data = pd.read_csv("data/preprocessed/bond_data.csv")
+bond_data_large = pd.read_csv("data/preprocessed/bond_data_large.csv")
 
 print("Checking that it is in a dataframe format:")
 print(type(bond_data))
@@ -238,7 +239,7 @@ print("done")
 # 3. Compute Monthly Market-Weighted Returns Using ret
 # -------------------------------
 # Get sorted unique month-end dates
-dates = sorted(bond_data['eom'].unique())
+dates = sorted(bond_data_large['eom'].unique())
 date_series = []  # Store the dates for which we compute returns
 
 # Define the groups for which we compute returns
@@ -251,7 +252,7 @@ di_returns = []  # For distressed bonds
 # Loop over each month (each date)
 for dt in dates:
     date_series.append(dt)
-    current_period = bond_data[bond_data['eom'] == dt]
+    current_period = bond_data_large[bond_data_large['eom'] == dt]
     
     # For each group (IG and HY), compute the market-weighted return.
     for grp in groups:
