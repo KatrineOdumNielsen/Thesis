@@ -131,13 +131,7 @@ bond_data["interp_yield"] = bond_data.apply(
     lambda row: get_interpolated_yield(yield_curve, row["eom"], row["tmt"]),
     axis=1
 )
-bond_data["credit_spread"] = bond_data['yield'] - bond_data['interp_yield'] ###WE NEED LAST PERIOD AS CREDIT SPREAD AS WELL
-
-# Remove observations with no rating / return / yield / amount outstanding
-bond_data_large = bond_data_large.dropna(subset=['rating_num'])
-bond_data_large = bond_data_large.dropna(subset=['ret_exc'])
-bond_data_large = bond_data_large.dropna(subset=['yield'])
-bond_data_large = bond_data_large.dropna(subset=['amount_outstanding'])
+bond_data["credit_spread"] = bond_data['yield'] - bond_data['interp_yield']
 
 # Adding definitions of distress
 bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 17.5
@@ -145,7 +139,32 @@ bond_data['distressed_rating'] = bond_data['rating_num'] > 17.5
 bond_data_large['distressed_spread'] = bond_data_large['credit_spread'] > 0.1
 bond_data['distressed_spread'] = bond_data['credit_spread'] > 0.1
 
-#Adding market value of last period
+# Adding rating from last period
+rating_data = wrds_data[['eom', 'cusip', 'rating_num']]
+rating_data = rating_data.sort_values(by=['cusip', 'eom'])
+rating_data['rating_num_past'] = rating_data.groupby('cusip')['rating_num'].shift(1)
+# Merge the rating_data onto bond_data and bond_data_large
+bond_data = pd.merge(bond_data, rating_data[['cusip', 'eom', 'rating_num_past']], on=['cusip', 'eom'], how='left')
+bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_past']], on=['cusip', 'eom'], how='left')
+
+#Adding credit spread from last period (large dataset)
+# Ensure data is sorted
+bond_data_large["eom"] = pd.to_datetime(bond_data_large["eom"])
+bond_data_large = bond_data_large.sort_values(["cusip", "eom"])
+# Compute last day of the prior month
+bond_data_large["prior_eom"] = (bond_data_large["eom"] - pd.DateOffset(months=1)).dt.to_period("M").dt.to_timestamp(how="end")
+# Create the new column as a string combining prior date and current cusip
+bond_data_large["prior_date_cusip"] = bond_data_large["prior_eom"].dt.strftime("%Y-%m-%d") + "_" + bond_data_large["cusip"]
+bond_data_large["current_date_cusip"] = bond_data_large["eom"].dt.strftime("%Y-%m-%d") + "_" + bond_data_large["cusip"]
+bond_data_large["prior_date_cusip_shift"] = bond_data_large["current_date_cusip"].shift(1)
+# Create the dummy variable equal to 1 if the prior observations is from last month and on the same cusip
+bond_data_large["dummy_prior_match"] = (bond_data_large["prior_date_cusip_shift"] == bond_data_large["prior_date_cusip"]).astype(int)
+# Shift the 'credit_spread' column by 1 and store it in 'credit_spread_prior'
+bond_data_large['credit_spread_prior'] = bond_data_large['credit_spread'].shift(1)
+# Remove observations where the prior observations was not the same cusip one month before
+bond_data_large.loc[bond_data_large['dummy_prior_match'] == 0, 'credit_spread_prior'] = np.nan
+
+# Adding market value of last period
 bond_data_large = bond_data_large.sort_values(by=['cusip', 'eom'])
 bond_data_large['market_value_past'] = bond_data_large.groupby('cusip')['market_value'].shift(1)
 bond_data_large['market_value_past'] = bond_data_large['market_value_past'].fillna(bond_data_large['market_value'] / (1 + bond_data_large['ret']))
@@ -153,8 +172,26 @@ bond_data = bond_data.sort_values(by=['cusip', 'eom'])
 bond_data['market_value_past'] = bond_data.groupby('cusip')['market_value'].shift(1)
 bond_data['market_value_past'] = bond_data['market_value_past'].fillna(bond_data['market_value'] / (1 + bond_data['ret']))
 
+# Remove observations with no rating / return / yield / amount outstanding
+bond_data_large = bond_data_large.dropna(subset=['rating_num'])
+bond_data_large = bond_data_large.dropna(subset=['ret_exc'])
+bond_data_large = bond_data_large.dropna(subset=['yield'])
+bond_data_large = bond_data_large.dropna(subset=['amount_outstanding'])
+bond_data_large = bond_data_large.dropna(subset=['duration'])
+# Remove observations with no rating / return / yield / amount outstanding
+bond_data = bond_data.dropna(subset=['rating_num'])
+bond_data = bond_data.dropna(subset=['ret_exc'])
+bond_data = bond_data.dropna(subset=['yield'])
+bond_data = bond_data.dropna(subset=['amount_outstanding'])
+bond_data = bond_data.dropna(subset=['duration'])
+
+#The first time a rating is observed, we assume it is the same as the rating of the next month
+bond_data['rating_num_past'] = bond_data['rating_num_past'].fillna(bond_data['rating_num'])
+bond_data['rating_num_past'] = bond_data['rating_num_past'].fillna(bond_data['rating_num'])
 
 # Save the data
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
 print("done")
+
+#jakob was here
