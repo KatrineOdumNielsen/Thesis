@@ -20,6 +20,7 @@ from scipy import stats
 #Set the working directory
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
+figures_folder = project_dir + "/figures"
 
 # Read the CSV file
 bond_data = pd.read_csv("data/preprocessed/bond_data.csv")
@@ -125,7 +126,8 @@ for i, var in enumerate(variables):
     axes[i].tick_params(axis='x', rotation=45)
 
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(figures_folder, "time_series_avg.png"))
+plt.close()
 
 # =============================================================================     
 #       Descriptive statistics for different rating groups          
@@ -313,7 +315,8 @@ plt.ylabel("Cumulative Return Index")
 plt.legend()
 plt.xticks(rotation=45)
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(figures_folder, "cumulative_returns_large.png"))
+plt.close()
 
 # 8. Plot Monthly (Simple) Returns
 plt.figure(figsize=(12, 6))
@@ -325,6 +328,7 @@ plt.ylabel("Monthly Return")
 plt.legend()
 plt.xticks(rotation=45)
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(figures_folder, "monthly_returns_large.png"))
+plt.close()
 
 print("done with large dataset")
