@@ -44,3 +44,4 @@ tzdata==2025.1
 urllib3==2.3.0
 wrds==3.3.0
 zict==3.0.0
+fredapi==0.5.2
