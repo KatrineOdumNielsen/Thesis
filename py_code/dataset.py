@@ -131,7 +131,7 @@ bond_data["interp_yield"] = bond_data.apply(
     lambda row: get_interpolated_yield(yield_curve, row["eom"], row["tmt"]),
     axis=1
 )
-bond_data["credit_spread"] = bond_data['yield'] - bond_data['interp_yield']
+bond_data["credit_spread"] = bond_data['yield'] - bond_data['interp_yield'] ###WE NEED LAST PERIOD AS CREDIT SPREAD AS WELL
 
 # Remove observations with no rating / return / yield / amount outstanding
 bond_data_large = bond_data_large.dropna(subset=['rating_num'])
