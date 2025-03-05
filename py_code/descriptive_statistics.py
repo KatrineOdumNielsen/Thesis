@@ -268,7 +268,7 @@ for dt in dates:
         group_returns[grp].append(weighted_return)
     
     # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed_rating'] == True]
+    distressed_data = current_period[current_period['distressed_spread'] == True]
     total_mv_di = distressed_data['market_value_past'].sum()
     if len(distressed_data) > 0 and total_mv_di > 0:
         weights_di = distressed_data['market_value_past'] / total_mv_di
@@ -324,6 +324,7 @@ plt.ylabel("Cumulative Return Index")
 plt.legend()
 plt.xticks(rotation=45)
 plt.tight_layout()
+plt.locator_params(axis='x', nbins=10)  # Adjust x-axis ticks
 plt.show()
 
 # -------------------------------
