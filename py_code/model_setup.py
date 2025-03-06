@@ -29,7 +29,7 @@ figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
 bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = bond_data[['eom', 'cusip', 'ret_exc', 'credit_spread_past', 'rating_class', 'market_value_past', 'price_eom']]
+model_data = bond_data[['eom', 'cusip', 'ret_exc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom_past']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data.to_csv("data/preprocessed/model_data.csv")
 ## HUSK AT ÆNDRE TIL PRICE_PAST####
@@ -47,8 +47,8 @@ for month in sorted(unique_months):
     # Assign portfolios for this month.
     # Order matters if the conditions are not mutually exclusive.
     month_data.loc[month_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
-    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class'] == '0.IG'), 'portfolio'] = 'IG'
-    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class'] == '1.HY'), 'portfolio'] = 'HY'
+    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_past'] == '0.IG'), 'portfolio'] = 'IG'
+    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_past'] == '1.HY'), 'portfolio'] = 'HY'
     month_data.loc[month_data['portfolio'].isnull(), 'portfolio'] = 'Other'
     
     # Store the resulting DataFrame in a dictionary keyed by the month.
@@ -66,8 +66,8 @@ print(portfolio_by_month)
 # ================== Add portfolio to the bond_data ===============
 model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
-model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class'] == '0.IG'), 'portfolio'] = 'IG'
-model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class'] == '1.HY'), 'portfolio'] = 'HY'
+model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_past'] == '0.IG'), 'portfolio'] = 'IG'
+model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_past'] == '1.HY'), 'portfolio'] = 'HY'
 model_data.to_csv("data/preprocessed/model_data.csv")
 
 portfolio_counts = model_data['portfolio'].value_counts()
@@ -233,6 +233,7 @@ plt.legend()
 plt.xticks(rotation=45)
 plt.grid(True)
 plt.tight_layout()
+plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
 plt.show()
 
 # ===================================================================    
