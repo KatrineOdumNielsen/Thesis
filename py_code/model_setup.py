@@ -60,15 +60,7 @@ DI_portfolio = portfolio_by_month[month][portfolio_by_month[month]['portfolio'] 
 
 print(portfolio_by_month)
 
-# ==================== Calculate monthly portfolio weighted returns ============================
-# Function to calculate weighted return for each bond
-def calculate_monthly_weighted_return(month_data):
-    monthly_total_portfolio_value_past = month_data.groupby('portfolio')['market_value_past'].sum()
-    month_data['portfolio_weight'] = month_data['market_value_past'] / monthly_total_portfolio_value_past
-    month_data['weighted_return'] = month_data['portfolio_weight'] * month_data['ret_exc']
-    return month_data
-
-#Add portfolio to the bond_data
+# ================== Add portfolio to the bond_data ===============
 model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class'] == '0.IG'), 'portfolio'] = 'IG'
@@ -82,31 +74,102 @@ print(portfolio_counts)
 # ===================================================================    
 #                      Calculate betas        
 # ===================================================================   
+
+# ==================== Calculate monthly portfolio weighted returns ============================
 # Function to calculate weighted return for each bond
-def calculate_weighted_return(model_data):
-    total_market_value_past = model_data['market_value_past'].sum()
-    model_data['weight'] = model_data['market_value_past'] / total_market_value_past
-    model_data['weighted_return'] = model_data['weight'] * model_data['ret_exc']
-    return model_data
+def calculate_monthly_weighted_return(month_data):
+    monthly_total_portfolio_value_past = month_data.groupby('portfolio')['market_value_past'].sum()
+    month_data['portfolio_weight'] = month_data['market_value_past'] / monthly_total_portfolio_value_past
+    month_data['weighted_return'] = month_data['portfolio_weight'] * month_data['ret_exc']
+    return month_data
 
-# Apply the function to calculate weighted return for each bond
-model_data = calculate_weighted_return(model_data)
 
-# Calculate the average weighted return across all bonds
-average_weighted_return = model_data['weighted_return'].mean()
-print("Average Weighted Return across all bonds:", average_weighted_return)
+def calculate_monthly_weighted_return(month_data):
+    """
+    Given a DataFrame for a single month with columns:
+    ['portfolio', 'market_value_past', 'ret_exc'],
+    compute each bond's portfolio weight and weighted return,
+    then sum over each portfolio to get final monthly returns.
+    """
+    # 1) For each row, get the sum of 'market_value_past' in that row's portfolio
+    sum_portfolio_mv_past = month_data.groupby('portfolio')['market_value_past'].transform('sum')
+    
+    # 2) Compute each bond's weight within its portfolio
+    month_data['portfolio_weight'] = month_data['market_value_past'] / sum_portfolio_mv_past
+    
+    # 3) Multiply each bond’s weight by its return
+    month_data['weighted_return'] = month_data['portfolio_weight'] * month_data['ret_exc']
+    
+    # 4) Sum weighted returns by portfolio to get the final monthly returns
+    monthly_returns = month_data.groupby('portfolio')['weighted_return'].sum()
+    
+    return monthly_returns
 
-portfolio_returns = model_data.groupby(['eom','portfolio'])['weighted_return'].sum()
+monthly_portfolio_returns = {}
+for m, df in portfolio_by_month.items():
+    returns_this_month = calculate_monthly_weighted_return(df)
+    monthly_portfolio_returns[m] = returns_this_month
 
-# Assuming you have a market return series to calculate beta against
-# For example, let's assume 'market_return' is a series of market returns
-market_return = model_data.groupby('eom')['weighted_return'].sum()
+# Convert the dictionary to a DataFrame.
+# The resulting DataFrame (monthly_port_ret) is in wide format,
+# with the index as the month (from the dictionary keys) and columns as portfolio names.
+monthly_port_ret = pd.DataFrame(monthly_portfolio_returns).T
 
-# Calculate the asset beta for each bond
+# Set the index name to 'eom' and then reset the index to turn it into a column.
+monthly_port_ret.index.name = 'eom'
+monthly_port_ret = monthly_port_ret.reset_index()
+
+# Convert the wide format DataFrame to long format:
+# Each row will then have: 'eom', 'portfolio', 'weighted_return'
+monthly_port_ret_long = monthly_port_ret.melt(id_vars='eom', var_name='portfolio', value_name='weighted_return')
+
+# Save monthly portfolio returns to CSV if desired
+monthly_port_ret_long.to_csv("data/preprocessed/monthly_portfolio_returns.csv", index=False)
+
+# ==================== Calculate monthly market weighted returns ============================
+# Function to calculate weighted return for each bond
+def calculate_weighted_return_per_month(df):
+    """
+    For each month (eom), compute each bond's weight, and then the bond-level weighted return.
+    """
+    # 1) Sum market_value_past within each month
+    monthly_sum_mv = df.groupby('eom')['market_value_past'].transform('sum')
+    
+    # 2) Each bond's weight is fraction of that month's total
+    df['weight'] = df['market_value_past'] / monthly_sum_mv
+    
+    # 3) Weighted return at bond-level
+    df['weighted_return'] = df['weight'] * df['ret_exc']
+    
+    return df
+
+# Apply the function
+model_data = calculate_weighted_return_per_month(model_data)
+
+# Now compute the overall market return per month by summing bond-level weighted returns
+market_return_df = (
+    model_data
+    .groupby('eom', as_index=False)['weighted_return']
+    .sum()
+    .rename(columns={'weighted_return': 'market_return'})
+)
+
+# If you have a separate DataFrame with monthly portfolio returns, 
+# merge it on 'eom' to get a column with the overall market return.
+monthly_portfolio_returns = monthly_port_ret  # your existing DataFrame with columns [eom, portfolio, ...]
+monthly_portfolio_returns = monthly_portfolio_returns.reset_index()  
+market_return_df = market_return_df.reset_index()
+
+returns_merged = pd.merge(monthly_port_ret_long, market_return_df, on='eom')
+
+# ==================== Compute betas for each portfolio ============================
 betas = {}
-for portfolio in model_data['portfolio'].unique():
-    portfolio_returns = model_data[model_data['portfolio'] == portfolio]['weighted_return']
-    cov_matrix = np.cov(portfolio_returns, market_return.loc[portfolio_returns.index])
+for portfolio in returns_merged['portfolio'].unique():
+    port_df = returns_merged[returns_merged['portfolio'] == portfolio]
+    port_ret = port_df['weighted_return']     # portfolio's monthly return
+    mkt_ret  = port_df['market_return']       # overall market return
+    
+    cov_matrix = np.cov(port_ret, mkt_ret)
     beta = cov_matrix[0, 1] / cov_matrix[1, 1]
     betas[portfolio] = beta
 
