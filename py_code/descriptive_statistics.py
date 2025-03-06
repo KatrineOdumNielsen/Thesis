@@ -171,7 +171,7 @@ for dt in dates:
     
     # For each group (IG and HY), compute the market-weighted return.
     for grp in groups:
-        group_data = current_period[current_period['rating_class'] == grp]
+        group_data = current_period[current_period['rating_class_past'] == grp]
         total_mv = group_data['market_value_past'].sum()
         
         if len(group_data) > 0 and total_mv > 0:
@@ -289,7 +289,7 @@ for dt in dates:
     
     # For each group (IG and HY), compute the market-weighted return.
     for grp in groups:
-        group_data = current_period[current_period['rating_class'] == grp]
+        group_data = current_period[current_period['rating_class_past'] == grp]
         total_mv = group_data['market_value_past'].sum()
         
         if len(group_data) > 0 and total_mv > 0:

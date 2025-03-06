@@ -127,13 +127,14 @@ bond_data_large["interp_yield"] = bond_data_large.apply(
 )
 bond_data_large["credit_spread"] = bond_data_large['yield'] - bond_data_large['interp_yield']
 
-# Adding rating and price data from last period
-rating_data = wrds_data[['eom', 'cusip', 'rating_num', 'price_eom']]
+# Adding rating, group and price data from last period
+rating_data = wrds_data[['eom', 'cusip', 'rating_num', 'rating_class', 'price_eom']]
 rating_data = rating_data.sort_values(by=['cusip', 'eom'])
 rating_data['rating_num_past'] = rating_data.groupby('cusip')['rating_num'].shift(1)
+rating_data['rating_class_past'] = rating_data.groupby('cusip')['rating_class'].shift(1)
 rating_data['price_eom_past'] = rating_data.groupby('cusip')['price_eom'].shift(1)
 # Merge the rating_data onto bond_data and bond_data_large
-bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_past', 'price_eom_past']], on=['cusip', 'eom'], how='left')
+bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_past', 'rating_class_past', 'price_eom_past']], on=['cusip', 'eom'], how='left')
 
 #Adding credit spread from last period (large dataset)
 # Ensure data is sorted
@@ -168,7 +169,7 @@ bond_data_large = bond_data_large.dropna(subset=['duration'])
 
 #The first time a rating is observed, we assume it is the same as the rating of the next month
 bond_data_large['rating_num_past'] = bond_data_large['rating_num_past'].fillna(bond_data_large['rating_num'])
-bond_data_large['rating_num_past'] = bond_data_large['rating_num_past'].fillna(bond_data_large['rating_num'])
+bond_data_large['rating_class_past'] = bond_data_large['rating_class_past'].fillna(bond_data_large['rating_class'])
 
 # Adding definitions of distress
 bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 18.5
