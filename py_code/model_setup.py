@@ -18,6 +18,9 @@
 import pandas as pd
 import numpy as np
 import os
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.cm as cm
 
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
@@ -161,17 +164,77 @@ monthly_portfolio_returns = monthly_portfolio_returns.reset_index()
 market_return_df = market_return_df.reset_index()
 
 returns_merged = pd.merge(monthly_port_ret_long, market_return_df, on='eom')
+returns_merged.to_csv("data/preprocessed/returns_merged.csv", index=False)
 
 # ==================== Compute betas for each portfolio ============================
-betas = {}
-for portfolio in returns_merged['portfolio'].unique():
-    port_df = returns_merged[returns_merged['portfolio'] == portfolio]
-    port_ret = port_df['weighted_return']     # portfolio's monthly return
-    mkt_ret  = port_df['market_return']       # overall market return
-    
-    cov_matrix = np.cov(port_ret, mkt_ret)
-    beta = cov_matrix[0, 1] / cov_matrix[1, 1]
-    betas[portfolio] = beta
+# --- Helper Function: Compute Beta over a Given Window of Monthly Returns ---
+def compute_beta(window_df, min_months=12):
+    """
+    Given a DataFrame window_df with columns:
+      'weighted_return' (portfolio returns) and 'market_return' (market returns),
+    compute beta as:
+         beta = Cov(portfolio returns, market returns) / Var(market returns)
+    If there are fewer than min_months observations or if the market variance is zero,
+    return np.nan.
+    """
+    pr = window_df['weighted_return'].values
+    mr = window_df['market_return'].values
+    if len(mr) < min_months or np.var(mr, ddof=1) == 0:
+        return np.nan
+    cov = np.cov(pr, mr, ddof=1)[0, 1]
+    var_market = np.var(mr, ddof=1)
+    return cov / var_market
 
-print("Asset Betas for each portfolio:")
-print(betas)
+# --- Main Loop: Compute Rolling Beta for Each Portfolio Using Historical Data ---
+# Ensure returns_merged is sorted by 'eom'
+returns_merged = returns_merged.sort_values('eom')
+
+beta_records = []
+# Loop over each portfolio separately.
+for portfolio in returns_merged['portfolio'].unique():
+    # Subset data for the current portfolio and sort by eom.
+    df_port = returns_merged[returns_merged['portfolio'] == portfolio].copy().sort_values('eom').reset_index(drop=True)
+    # Loop over each month (by index and date)
+    for i, current_date in enumerate(df_port['eom']):
+        if i < 12:
+            # Skip the first 12 months (no full 12-month history available).
+            continue
+        if i < 60:
+            # For months 13 up to 60, use all available historical months.
+            window_df = df_port.iloc[0:i]
+        else:
+            # For month 61 and later, use only the previous 60 months.
+            window_df = df_port.iloc[i-60:i]
+        n_months = len(window_df)
+        # Compute beta using the available window (minimum required is 12 months).
+        beta_val = compute_beta(window_df, min_months=12)
+        beta_records.append({
+            'portfolio': portfolio,
+            'eom': current_date,
+            'beta': beta_val,
+            'n_months': n_months
+        })
+
+beta_df = pd.DataFrame(beta_records)
+print("Rolling Beta DataFrame (variable window up to 60 months):")
+print(beta_df)
+
+# --- Plot the Rolling Betas for Each Portfolio ---
+cmap = cm.get_cmap('GnBu', 5).reversed()
+
+plt.figure(figsize=(10, 6))
+for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
+    sub_df = beta_df[beta_df['portfolio'] == portfolio]
+    plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
+plt.xlabel("End-of-Month (eom)")
+plt.ylabel("Rolling Beta")
+plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
+plt.legend()
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# ===================================================================    
+#                      Calculate capital gain overhang        
+# ===================================================================   
