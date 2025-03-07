@@ -1,19 +1,11 @@
-# Ask Harris about the code when we set this up; how to access the model from another py file
-# def model():
-#     model = Sequential()
-#     model.add(Dense(32, input_dim=784))
-#     model.add(Activation('relu'))
-#     model.add(Dense(10))
-#     model.add(Activation('softmax'))
-
 # =============================================================================
 #
-#                     Part X: Model Setup
+#                     Part X: Model Setup A
+#                   (Beta and Capital Gain overhang)
 #
 #         (Considers only subset including the cleaned data)
 #
 # =============================================================================
-
 # Importing necessary libraries
 import pandas as pd
 import numpy as np
@@ -22,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.cm as cm
 import seaborn as sns
+from scipy.stats import skew
 
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
@@ -32,56 +25,40 @@ figures_folder = project_dir + "/figures"
 bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
 model_data = bond_data[['eom', 'cusip', 'ret_exc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom_past']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
-model_data.to_csv("data/preprocessed/model_data.csv")
-## HUSK AT ÆNDRE TIL PRICE_PAST####
+model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
 
 # ===================================================================    
-#                      Set up portfolios        
+#                     a. Set up portfolios by month        
 # ===================================================================                                                         
-
 bond_data['eom'] = pd.to_datetime(model_data['eom'])
 unique_months = model_data['eom'].unique()
 portfolio_by_month = {}
 
 for month in sorted(unique_months):
     month_data = model_data[model_data['eom'] == month].copy()
-    # Assign portfolios for this month.
-    # Order matters if the conditions are not mutually exclusive.
+    # Assign portfolios for this month based on credit spread and rating class
     month_data.loc[month_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
     month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_past'] == '0.IG'), 'portfolio'] = 'IG'
     month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_past'] == '1.HY'), 'portfolio'] = 'HY'
     month_data.loc[month_data['portfolio'].isnull(), 'portfolio'] = 'Other'
-    
-    # Store the resulting DataFrame in a dictionary keyed by the month.
-    portfolio_by_month[month] = month_data
+    portfolio_by_month[month] = month_data # Save the DataFrame for this month
 
-# Now you have a dictionary where for each month you have three portfolios.
-
-month = sorted(unique_months)[0]
-IG_portfolio = portfolio_by_month[month][portfolio_by_month[month]['portfolio'] == 'IG']
-HY_portfolio = portfolio_by_month[month][portfolio_by_month[month]['portfolio'] == 'HY']
-DI_portfolio = portfolio_by_month[month][portfolio_by_month[month]['portfolio'] == 'DI']
-
-print(portfolio_by_month)
-
-# ================== Add portfolio to the bond_data ===============
+# Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_past'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_past'] == '1.HY'), 'portfolio'] = 'HY'
 model_data.to_csv("data/preprocessed/model_data.csv")
 
-portfolio_counts = model_data['portfolio'].value_counts()
-print("Portfolio counts:")
-print(portfolio_counts)
+# print("Portfolio counts:")
+# print(model_data['portfolio'].value_counts())
 
 # ===================================================================    
-#                      Calculate betas        
+#             b. Calculate monthly portfolio weighted returns        
 # ===================================================================   
-
-# ==================== Calculate monthly portfolio weighted returns ============================
 # Function to calculate weighted return for each bond
 def calculate_monthly_weighted_return(month_data):
+    """Compute the monthly weighted return by portfolio for a given month."""
     monthly_total_portfolio_value_past = month_data.groupby('portfolio')['market_value_past'].sum()
     month_data['portfolio_weight'] = month_data['market_value_past'] / monthly_total_portfolio_value_past
     month_data['weighted_return'] = month_data['portfolio_weight'] * month_data['ret_exc']
@@ -114,41 +91,26 @@ for m, df in portfolio_by_month.items():
     returns_this_month = calculate_monthly_weighted_return(df)
     monthly_portfolio_returns[m] = returns_this_month
 
-# Convert the dictionary to a DataFrame.
-# The resulting DataFrame (monthly_port_ret) is in wide format,
-# with the index as the month (from the dictionary keys) and columns as portfolio names.
+# Convert the result in to a DataFrame.
 monthly_port_ret = pd.DataFrame(monthly_portfolio_returns).T
-
-# Set the index name to 'eom' and then reset the index to turn it into a column.
 monthly_port_ret.index.name = 'eom'
 monthly_port_ret = monthly_port_ret.reset_index()
-
-# Convert the wide format DataFrame to long format:
-# Each row will then have: 'eom', 'portfolio', 'weighted_return'
 monthly_port_ret_long = monthly_port_ret.melt(id_vars='eom', var_name='portfolio', value_name='weighted_return')
 
-# Save monthly portfolio returns to CSV if desired
-monthly_port_ret_long.to_csv("data/preprocessed/monthly_portfolio_returns.csv", index=False)
-
-# ==================== Calculate monthly market weighted returns ============================
+# ===================================================================    
+#            c.  Calculate monthly market weighted returns        
+# ===================================================================  
 # Function to calculate weighted return for each bond
 def calculate_weighted_return_per_month(df):
     """
-    For each month (eom), compute each bond's weight, and then the bond-level weighted return.
+    For each month, compute each bond's weight, and then the bond-level weighted return.
     """
-    # 1) Sum market_value_past within each month
     monthly_sum_mv = df.groupby('eom')['market_value_past'].transform('sum')
-    
-    # 2) Each bond's weight is fraction of that month's total
     df['weight'] = df['market_value_past'] / monthly_sum_mv
-    
-    # 3) Weighted return at bond-level
     df['weighted_return'] = df['weight'] * df['ret_exc']
-    
     return df
 
-# Apply the function
-model_data = calculate_weighted_return_per_month(model_data)
+model_data = calculate_weighted_return_per_month(model_data) # Apply the function
 
 # Now compute the overall market return per month by summing bond-level weighted returns
 market_return_df = (
@@ -158,22 +120,14 @@ market_return_df = (
     .rename(columns={'weighted_return': 'market_return'})
 )
 
-# If you have a separate DataFrame with monthly portfolio returns, 
-# merge it on 'eom' to get a column with the overall market return.
-monthly_portfolio_returns = monthly_port_ret  # your existing DataFrame with columns [eom, portfolio, ...]
-monthly_portfolio_returns = monthly_portfolio_returns.reset_index()  
-market_return_df = market_return_df.reset_index()
-
 returns_merged = pd.merge(monthly_port_ret_long, market_return_df, on='eom')
-returns_merged.to_csv("data/preprocessed/returns_merged.csv", index=False)
 
-# ==================== Compute betas for each portfolio ============================
-# --- Helper Function: Compute Beta over a Given Window of Monthly Returns ---
+
+# ===================================================================    
+#           d.   Compute rolling betas for each portfolio        
+# ===================================================================  
 def compute_beta(window_df, min_months=12):
-    """
-    Given a DataFrame window_df with columns:
-      'weighted_return' (portfolio returns) and 'market_return' (market returns),
-    compute beta as:
+    """Compute beta as:
          beta = Cov(portfolio returns, market returns) / Var(market returns)
     If there are fewer than min_months observations or if the market variance is zero,
     return np.nan.
@@ -186,28 +140,19 @@ def compute_beta(window_df, min_months=12):
     var_market = np.var(mr, ddof=1)
     return cov / var_market
 
-# --- Main Loop: Compute Rolling Beta for Each Portfolio Using Historical Data ---
-# Ensure returns_merged is sorted by 'eom'
-returns_merged = returns_merged.sort_values('eom')
-
+# Loop over each portfolio and each month to calculate beta
 beta_records = []
-# Loop over each portfolio separately.
-for portfolio in returns_merged['portfolio'].unique():
-    # Subset data for the current portfolio and sort by eom.
+returns_merged = returns_merged.sort_values('eom')
+for portfolio in returns_merged['portfolio'].unique(): # Loop over each portfolio separately.
     df_port = returns_merged[returns_merged['portfolio'] == portfolio].copy().sort_values('eom').reset_index(drop=True)
-    # Loop over each month (by index and date)
     for i, current_date in enumerate(df_port['eom']):
-        if i < 12:
-            # Skip the first 12 months (no full 12-month history available).
+        if i < 12:     # Skip the first 12 months (no full 12-month history available).
             continue
-        if i < 60:
-            # For months 13 up to 60, use all available historical months.
+        if i < 60:     # For months 13 up to 60, use all available historical months.
             window_df = df_port.iloc[0:i]
-        else:
-            # For month 61 and later, use only the previous 60 months.
+        else:          # For month 61 and later, use only the previous 60 months.
             window_df = df_port.iloc[i-60:i]
         n_months = len(window_df)
-        # Compute beta using the available window (minimum required is 12 months).
         beta_val = compute_beta(window_df, min_months=12)
         beta_records.append({
             'portfolio': portfolio,
@@ -223,27 +168,25 @@ print(beta_df)
 # --- Plot the Rolling Betas for Each Portfolio ---
 cmap = cm.get_cmap('GnBu', 5).reversed()
 
-plt.figure(figsize=(10, 6))
-for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
-    sub_df = beta_df[beta_df['portfolio'] == portfolio]
-    plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
-plt.xlabel("End-of-Month (eom)")
-plt.ylabel("Rolling Beta")
-plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
-plt.legend()
-plt.xticks(rotation=45)
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
-plt.close()
+# plt.figure(figsize=(10, 6))
+# for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
+#     sub_df = beta_df[beta_df['portfolio'] == portfolio]
+#     plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
+# plt.xlabel("End-of-Month (eom)")
+# plt.ylabel("Rolling Beta")
+# plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
+# plt.legend()
+# plt.xticks(rotation=45)
+# plt.grid(True)
+# plt.tight_layout()
+# plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
+# plt.close()
 
 # ===================================================================    
-#                      Calculate capital gain overhang        
+#           e.  Calculate capital gain overhang  (CGO)      
 # ===================================================================   
 monthly_turnover = 0.015 #using quarterly turnover of 4.5% from Peter's paper
 
-
-# ==================== Computing purchase price and CGO ============================
 def compute_effective_purchase_price_linear(group):
     """
     For a given bond (grouped by 'cusip'), compute the effective purchase price and capital gain overhang for each month
@@ -265,16 +208,11 @@ def compute_effective_purchase_price_linear(group):
         past_prices = group.iloc[:i]['price_eom_past'].values
         n = len(past_prices)
         k_values = np.arange(1, n+1)  # k = 1, 2, ..., n
-        # Linear weights: most recent gets weight = 1, then decreasing linearly
-        weights = 1 - monthly_turnover * (k_values - 1)
-        # Reverse weights so the most recent observation gets the highest weight
-        weights = weights[::-1]
-        # Normalize so weights sum to 1
-        weights = weights / np.sum(weights)
-        
+        weights = 1 - monthly_turnover * (k_values - 1) # Linear weights: most recent gets weight = 1
+        weights = weights[::-1]  # Reverse weights so the most recent observation gets the highest weight
+        weights = weights / np.sum(weights)   # Normalize so weights sum to 1
         effective_price = np.sum(weights * past_prices)
         effective_prices.append(effective_price)
-        
         current_price = group.iloc[i]['price_eom_past']
         cgo = (current_price / effective_price - 1) * 100
         cgo_values.append(cgo)
@@ -305,44 +243,93 @@ def compute_effective_purchase_price_linear(group):
 #     return group
 
 
-# Assuming model_data is your DataFrame with columns: ['eom', 'cusip', 'price_eom']
 print('Applying the function group-wise by bond (cusip) ...')
-model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data = model_data.sort_values(['cusip', 'eom'])
-model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_linear)
+model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_linear).reset_index(drop=True)
 model_data.to_csv("data/preprocessed/model_data_cgo.csv")
+model_data.to_csv(os.path.join(data_folder + "/preprocessed/model_data_cgo.csv"), index=False)
 
-# Inspect the result for a single bond
-first_bond = model_data.iloc[0]['cusip']
-print(model_data[model_data['cusip'] == first_bond].head(10))
-
-
-# ================= CGO at portfolio level, first monthly then yearly ======================
-# 1. Monthly Portfolio Averages
-# Group by end-of-month and portfolio, then calculate the average CGO
+# Aggregate CGO at portfolio level, first monthly then yearly
 monthly_cgo = (
     model_data.groupby(['eom', 'portfolio'])['cap_gain_overhang']
-    .mean()
+    .median() # Use median rather than mean, maybe change
     .reset_index()
 )
-print("Monthly Average Capital Gain Overhang by Portfolio:")
+print("Monthly Median Capital Gain Overhang by Portfolio:")
 print(monthly_cgo.head())
 
-# 2. Annual Portfolio Averages
 # Extract the year from the end-of-month dates, and then group by year and portfolio
-monthly_cgo['year'] = monthly_cgo['eom'].dt.year
-annual_cgo = (
-    monthly_cgo.groupby(['year', 'portfolio'])['cap_gain_overhang']
-    .mean()
-    .reset_index()
-)
-print("Annual Average Capital Gain Overhang by Portfolio:")
-print(annual_cgo.head())
-annual_cgo.to_csv(os.path.join("data", "preprocessed", "annual_cap_gain_overhang.csv"), index=False)
+# monthly_cgo['year'] = monthly_cgo['eom'].dt.year
+# annual_cgo = (
+#     monthly_cgo.groupby(['year', 'portfolio'])['cap_gain_overhang']
+#     .median() # Use median rather than mean, maybe change
+#     .reset_index()
+# )
+
+# =============================================================================
+#               f. Calculate volatility and skewness 
+# =============================================================================
+model_data = model_data.sort_values(['portfolio', 'cusip', 'eom'])
+model_data['ret_exc'] = model_data['ret_exc'].fillna(0)
+model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
+
+def compute_annual_return(bond_df):
+    """
+    For a given bond (grouped by cusip), compute the annual return using a rolling
+    12-month window. The annual return is computed as:
+        annual_return = exp(sum(log_ret over 12 months)) - 1).
+    If fewer than 12 months are available, return NaN.
+    """
+    bond_df = bond_df.sort_values('eom').reset_index(drop=True)
+    annual_returns = []
+    for i in range(len(bond_df)):
+        if i + 12 <= len(bond_df):
+            window = bond_df.loc[i:i+11, 'log_ret']
+            annual_ret = np.exp(window.sum()) - 1
+        else:
+            annual_ret = np.nan
+        annual_returns.append(annual_ret)
+    bond_df['annual_return'] = annual_returns
+    return bond_df
+
+# We'll loop over each portfolio and compute the cross-sectional volatility and skewness.
+vol_skew_list = []
+portfolios = model_data['portfolio'].unique()
+for port in portfolios:
+    port_data = model_data[model_data['portfolio'] == port].copy()
+    port_data = port_data.groupby('cusip').apply(compute_annual_return).reset_index(drop=True)
+    vol_skew = port_data.groupby('eom')['annual_return'].agg(
+        volatility = lambda x: np.nanstd(x),
+        skewness   = lambda x: skew(x, nan_policy='omit')
+    ).reset_index()
+    vol_skew['portfolio'] = port # Add the portfolio label for clarity.
+    vol_skew_list.append(vol_skew)
+
+final_vol_skew = pd.concat(vol_skew_list, ignore_index=True) # Concatenate the results from all portfolios.
+
+print("Volatility and Skewness for Each Portfolio:")
+print(final_vol_skew.head())
+
+# =============================================================================
+#                     g.  Merging to one dataset 
+# =============================================================================
+final_monthly_df = monthly_port_ret_long.copy()
+final_monthly_df = final_monthly_df.merge(beta_df[['eom', 'portfolio', 'beta']],
+                                          on=['eom', 'portfolio'], how='left')
+final_monthly_df = final_monthly_df.merge(monthly_cgo[['eom', 'portfolio', 'cap_gain_overhang']],
+                                          on=['eom', 'portfolio'], how='left')
+final_monthly_df = final_monthly_df.merge(market_return_df, on='eom', how='left')
+final_monthly_df = final_monthly_df.merge(
+    final_vol_skew[['eom', 'portfolio', 'volatility', 'skewness']],
+    on=['eom', 'portfolio'],
+    how='left')
+final_monthly_df.to_csv(os.path.join(data_folder, "preprocessed", "final_monthly_data.csv"), index=False)
+print("Final monthly dataset created.")
 
 
-
-# ==================== Checking the accuracy of the calculations ============================
+# =============================================================================
+#               h. Checking the accuracy of the CGO calculations 
+# =============================================================================
 # # -------------------------------
 # # 1. Descriptive Statistics
 # # -------------------------------
