@@ -21,6 +21,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.cm as cm
+import seaborn as sns
 
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
@@ -234,9 +235,202 @@ plt.xticks(rotation=45)
 plt.grid(True)
 plt.tight_layout()
 plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
-plt.show()
+plt.close()
 
 # ===================================================================    
 #                      Calculate capital gain overhang        
 # ===================================================================   
+monthly_turnover = 0.015 #using quarterly turnover of 4.5% from Peter's paper
 
+
+# ==================== Computing purchase price and CGO ============================
+def compute_effective_purchase_price_linear(group):
+    """
+    For a given bond (grouped by 'cusip'), compute the effective purchase price and capital gain overhang for each month
+    using linear decaying weights.
+    
+    For the first observation, we set the effective price equal to the current price (CGO = 0%).
+    For subsequent observations, we compute weights linearly as:
+        weight(k) = 1 - monthly_turnover * (k - 1)
+    for k = 1,2,..., where k=1 corresponds to the most recent past observation.
+    The weights are then reversed (to align with past_prices order) and normalized.
+    """
+    group = group.sort_values('eom').copy()
+    
+    # For the first observation, set effective price equal to current price, and CGO = 0%
+    effective_prices = [group.iloc[0]['price_eom_past']]
+    cgo_values = [0.0]
+    
+    for i in range(1, len(group)):
+        past_prices = group.iloc[:i]['price_eom_past'].values
+        n = len(past_prices)
+        k_values = np.arange(1, n+1)  # k = 1, 2, ..., n
+        # Linear weights: most recent gets weight = 1, then decreasing linearly
+        weights = 1 - monthly_turnover * (k_values - 1)
+        # Reverse weights so the most recent observation gets the highest weight
+        weights = weights[::-1]
+        # Normalize so weights sum to 1
+        weights = weights / np.sum(weights)
+        
+        effective_price = np.sum(weights * past_prices)
+        effective_prices.append(effective_price)
+        
+        current_price = group.iloc[i]['price_eom_past']
+        cgo = (current_price / effective_price - 1) * 100
+        cgo_values.append(cgo)
+    
+    group['effective_price'] = effective_prices
+    group['cap_gain_overhang'] = cgo_values
+    return group
+
+## To switch back to the exponential method, use the code below:
+# def compute_effective_purchase_price_exponential(group):
+#     group = group.sort_values('eom').copy()
+#     effective_prices = [group.iloc[0]['price_eom']]
+#     cgo_values = [0.0]
+#     for i in range(1, len(group)):
+#         past_prices = group.iloc[:i]['price_eom'].values
+#         n = len(past_prices)
+#         k_values = np.arange(1, n+1)
+#         weights = monthly_turnover * (1 - monthly_turnover)**(k_values - 1)
+#         weights = weights[::-1]
+#         weights = weights / np.sum(weights)
+#         effective_price = np.sum(weights * past_prices)
+#         effective_prices.append(effective_price)
+#         current_price = group.iloc[i]['price_eom']
+#         cgo = (current_price / effective_price - 1) * 100
+#         cgo_values.append(cgo)
+#     group['effective_price'] = effective_prices
+#     group['cap_gain_overhang'] = cgo_values
+#     return group
+
+
+# Assuming model_data is your DataFrame with columns: ['eom', 'cusip', 'price_eom']
+print('Applying the function group-wise by bond (cusip) ...')
+model_data['eom'] = pd.to_datetime(model_data['eom'])
+model_data = model_data.sort_values(['cusip', 'eom'])
+model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_linear)
+model_data.to_csv("data/preprocessed/model_data_cgo.csv")
+
+# Inspect the result for a single bond
+first_bond = model_data.iloc[0]['cusip']
+print(model_data[model_data['cusip'] == first_bond].head(10))
+
+
+# ================= CGO at portfolio level, first monthly then yearly ======================
+# 1. Monthly Portfolio Averages
+# Group by end-of-month and portfolio, then calculate the average CGO
+monthly_cgo = (
+    model_data.groupby(['eom', 'portfolio'])['cap_gain_overhang']
+    .mean()
+    .reset_index()
+)
+print("Monthly Average Capital Gain Overhang by Portfolio:")
+print(monthly_cgo.head())
+
+# 2. Annual Portfolio Averages
+# Extract the year from the end-of-month dates, and then group by year and portfolio
+monthly_cgo['year'] = monthly_cgo['eom'].dt.year
+annual_cgo = (
+    monthly_cgo.groupby(['year', 'portfolio'])['cap_gain_overhang']
+    .mean()
+    .reset_index()
+)
+print("Annual Average Capital Gain Overhang by Portfolio:")
+print(annual_cgo.head())
+annual_cgo.to_csv(os.path.join("data", "preprocessed", "annual_cap_gain_overhang.csv"), index=False)
+
+
+
+# ==================== Checking the accuracy of the calculations ============================
+# # -------------------------------
+# # 1. Descriptive Statistics
+# # -------------------------------
+# print("Summary Statistics for Capital Gain Overhang:")
+# print(model_data['cap_gain_overhang'].describe())
+# print("Median Capital Gain Overhang:", model_data['cap_gain_overhang'].median())
+
+# # -------------------------------
+# # 2. Distribution Visualization
+# # -------------------------------
+
+# # Histogram with KDE to inspect the overall distribution
+# plt.figure(figsize=(10, 6))
+# # We can pick a single color from the colormap, e.g. cmap(1)
+# sns.histplot(
+#     model_data['cap_gain_overhang'].dropna(),
+#     bins=50,
+#     kde=True,
+#     color=cmap(1)  # Using one color from the reversed colormap
+# )
+# plt.xlabel('Capital Gain Overhang (%)')
+# plt.title('Distribution of Capital Gain Overhang (using price_eom_past)')
+# plt.tight_layout()
+# plt.show()
+
+# # Boxplot by Portfolio to see differences across portfolios
+# unique_portfolios = sorted(model_data['portfolio'].dropna().unique())
+# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+
+# plt.figure(figsize=(10, 6))
+# sns.boxplot(
+#     data=model_data,
+#     x='portfolio',
+#     y='cap_gain_overhang',
+#     order=unique_portfolios,       # ensure consistent order
+#     palette=palette_colors         # use our custom palette
+# )
+# plt.title('Capital Gain Overhang by Portfolio')
+# plt.xlabel('Portfolio')
+# plt.ylabel('Capital Gain Overhang (%)')
+# plt.tight_layout()
+# plt.show()
+
+# # -------------------------------
+# # 3. Time Series Visualization
+# # -------------------------------
+
+# # Calculate the average capital gain overhang for each month and portfolio.
+# portfolio_cgo = model_data.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
+# unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
+# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+
+# plt.figure(figsize=(12, 6))
+# for i, portfolio in enumerate(unique_portfolios):
+#     sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
+#     plt.plot(
+#         sub_df['eom'], sub_df['cap_gain_overhang'],
+#         marker='o',
+#         label=portfolio,
+#         color=palette_colors[i]
+#     )
+# plt.xlabel('Date (eom)')
+# plt.ylabel('Average Capital Gain Overhang (%)')
+# plt.title('Monthly Average Capital Gain Overhang by Portfolio')
+# plt.xticks(rotation=45)
+# plt.legend()
+# plt.tight_layout()
+# plt.show()
+
+# # -------------------------------
+# # 4. (Optional) Annual Aggregation
+# # -------------------------------
+
+# # For annual averages, we can further group by year.
+# unique_portfolios = sorted(annual_cgo['portfolio'].dropna().unique())
+# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+# plt.figure(figsize=(12, 6))
+# sns.barplot(
+#     data=annual_cgo,
+#     x='year',
+#     y='cap_gain_overhang',
+#     hue='portfolio',
+#     hue_order=unique_portfolios,
+#     palette=palette_colors
+# )
+# plt.xlabel('Year')
+# plt.ylabel('Average Capital Gain Overhang (%)')
+# plt.title('Annual Average Capital Gain Overhang by Portfolio')
+# plt.xticks(rotation=45)
+# plt.tight_layout()
+# plt.show()
