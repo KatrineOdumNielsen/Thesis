@@ -328,7 +328,18 @@ print("Final monthly dataset created.")
 
 
 # =============================================================================
-#               h. Checking the accuracy of the CGO calculations 
+#                     h.  Obtaining average values 
+# =============================================================================
+average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
+print("Average metrics per bond portfolio:")
+print(average_metrics)
+
+median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
+print("Median metrics per bond portfolio:")
+print(median_metrics)
+
+# =============================================================================
+#               i. Checking the accuracy of the CGO calculations 
 # =============================================================================
 # # -------------------------------
 # # 1. Descriptive Statistics
