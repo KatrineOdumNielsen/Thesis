@@ -268,6 +268,7 @@ def compute_effective_purchase_price_exponential_earliest(group):
     
     effective_prices = [group.iloc[0]['price_eom_past']]
     cgo_values = [0.0]
+
     
     for i in range(1, len(group)):
         # We have i observations so far: 0, 1, ..., i-1
@@ -290,6 +291,10 @@ def compute_effective_purchase_price_exponential_earliest(group):
         # The i-th row in group corresponds to the 'current' date
         # The 'past_prices' are the prices from index 0..(i-1)
         past_prices = group.iloc[:i]['price_eom_past'].values
+
+         # Apply the condition to adjust price_eom for k=0
+        #if group.iloc[0]['offering_date'] < '2002-07-31':
+            #past_prices[0] = 100
         
         # Weighted sum of the past prices
         effective_price = np.sum(weights * past_prices)
@@ -304,6 +309,10 @@ def compute_effective_purchase_price_exponential_earliest(group):
     group['cap_gain_overhang'] = cgo_values
     return group
 
+#offering_date = pd.read_csv(data_folder + "/raw/all_wrds_data.csv")
+#offering_data = offering_date.columns.str.lower()
+#offering_date = offering_date[['eom', 'cusip', 'offering_date']]
+#model_data = model_data.merge(offering_date, on=['eom', 'cusip'], how='left')
 
 print('Applying the function group-wise by bond (cusip) ...')
 model_data = model_data.sort_values(['cusip', 'eom'])
