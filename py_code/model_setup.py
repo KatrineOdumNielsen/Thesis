@@ -269,6 +269,41 @@ print(monthly_cgo.head())
 # =============================================================================
 #               f. Calculate volatility and skewness 
 # =============================================================================
+
+# Sort model_data by portfolio and eom and reset the index.
+model_data = model_data.sort_values(['portfolio', 'eom']).reset_index(drop=True)
+vol_skew_records = []
+portfolios = model_data['portfolio'].unique()
+
+for port in portfolios:
+    df_port = model_data[model_data['portfolio'] == port].copy().reset_index(drop=True)
+    for i, current_date in enumerate(df_port['eom']):
+        if i < 12:
+            continue
+        if i < 60:
+            window_df = df_port.iloc[0:i]
+        else:
+            window_df = df_port.iloc[i-60:i]
+        vol = np.nanstd(window_df['ret_exc'])
+        skw = skew(window_df['ret_exc'], nan_policy='omit')
+        vol_skew_records.append({
+            'portfolio': port,
+            'eom': current_date,
+            'volatility': vol,
+            'skewness': skw,
+            'n_months': len(window_df)
+        })
+
+final_vol_skew = pd.DataFrame(vol_skew_records)
+
+print("Rolling Volatility and Skewness for Each Portfolio:")
+print(final_vol_skew.head())
+
+
+
+
+#or
+
 model_data = model_data.sort_values(['portfolio', 'cusip', 'eom'])
 model_data['ret_exc'] = model_data['ret_exc'].fillna(0)
 model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
