@@ -15,6 +15,7 @@ from scipy.stats import skew
 from scipy.optimize import fsolve
 from math import sqrt
 import timeit
+import matplotlib.pyplot as plt
 
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
@@ -26,7 +27,7 @@ average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics.csv")
 # ===================================================================    
 #                     a. Set up known parameters        
 # ===================================================================
-nu = 7.5
+nu = 17
 sigma_m = 0.25
 Rf = 1
 gamma_hat, b0 = (0.6, 0.6)
@@ -81,73 +82,159 @@ thetas_df.to_csv(data_folder + '/preprocessed/thetas_df.csv') # Export for later
 # ======================================================================================================================
 # Calculating S and zeta
 # ======================================================================================================================
-# print("Calculating S and zeta")
-
-# def equation_vol_skew(p,*args): # Defines the equation 
-#     Si, zetai = p
-#     volatility, skewness = args
-#     return[(nu/(nu-2) * Si + ((2 * nu ** 2) / ((nu-2)**2 * (nu-4))) * zetai**2) ** (0.5) - volatility,
-#             ((2 * zetai * sqrt(nu * (nu - 4)) /
-#               (sqrt(Si) * ((2 * nu * zetai ** 2) / Si + (nu - 2) * (nu - 4)) ** (3 / 2)))
-#              * (3 * (nu - 2) + (8 * nu * zetai ** 2) / (Si * (nu - 6))))- skewness]
-
-
-# def fsolve_si_zetai(volatility, skewness): # Attempts to find values of Si and zetai that satisfy equation_std_skew.
-#     Si, zetai = fsolve(equation_vol_skew,(0.1, 0.1),args=(volatility, skewness))
-#     # return {'Si':Si, 'zetai':zetai}
-#     return Si, zetai
-
-
-# start = timeit.default_timer()
-# average_metrics['Si'], average_metrics['zetai'] = zip(*average_metrics.apply(lambda x: fsolve_si_zetai(x.volatility, x.skewness), axis=1))
-
-# stop = timeit.default_timer()
-# execution_time = stop - start
-# print(f"Program Executed in {execution_time} seconds")  # Returns time in seconds
-
-# average_metrics.to_csv(data_folder + '/preprocessed/average_metrics_updated.csv', index = False) # Export for later use
-# print("done solving S and zetai")
-
-
 print("Calculating S and zeta")
 
-def equation_vol_skew(p, *args):
+def equation_vol_skew(p,*args): # Defines the equations 
     Si, zetai = p
     volatility, skewness = args
-    
-    # Ensure that Si is strictly positive
     if Si <= 0:
         return [1e6, 1e6]
-    
-    # Compute the theoretical standard deviation
-    eq1 = ((nu/(nu-2) * Si + ((2 * nu ** 2) / ((nu-2)**2 * (nu-4))) * zetai**2) ** 0.5) - volatility
-    
-    # Compute the expression inside the skewness formula
-    expr = ((2 * nu * zetai ** 2) / Si + (nu - 2) * (nu - 4))
-    # If this expression is negative, the power (3/2) is not defined for real numbers
-    if expr < 0:
-        return [1e6, 1e6]
-    
-    eq2 = ((2 * zetai * sqrt(nu * (nu - 4)) /
-            (sqrt(Si) * (expr) ** (3/2))) *
-           (3 * (nu - 2) + (8 * nu * zetai ** 2) / (Si * (nu - 6)))) - skewness
-    
-    return [eq1, eq2]
+    return[(nu/(nu-2) * Si + ((2 * nu ** 2) / ((nu-2)**2 * (nu-4))) * zetai**2) ** (0.5) - volatility,
+                ((2 * zetai * sqrt(nu * (nu - 4)) /
+                (sqrt(Si) * ((2 * nu * zetai ** 2) / Si + (nu - 2) * (nu - 4)) ** (3 / 2)))
+                * (3 * (nu - 2) + (8 * nu * zetai ** 2) / (Si * (nu - 6))))- skewness]
 
-def fsolve_si_zetai(volatility, skewness):
-    # Attempts to solve for Si and zetai, with an initial guess (0.1, 0.1)
-    Si, zetai = fsolve(equation_vol_skew, (0.1, 0.1), args=(volatility, skewness))
+
+def fsolve_si_zetai(volatility, skewness): # Attempts to find values of Si and zetai that satisfy equation_std_skew.
+    Si, zetai = fsolve(equation_vol_skew,(0.2, 0.2),args=(volatility, skewness))
+    # return {'Si':Si, 'zetai':zetai}
     return Si, zetai
 
+
 start = timeit.default_timer()
-# Make sure that average_metrics has columns 'volatility' and 'skewness'
-average_metrics['Si'], average_metrics['zetai'] = zip(*average_metrics.apply(
-    lambda x: fsolve_si_zetai(x.volatility, x.skewness), axis=1))
+average_metrics['Si'], average_metrics['zetai'] = zip(*average_metrics.apply(lambda x: fsolve_si_zetai(x.volatility, x.skewness), axis=1))
+
 stop = timeit.default_timer()
 execution_time = stop - start
 print(f"Program Executed in {execution_time} seconds")  # Returns time in seconds
 
-# Save the updated DataFrame (ensure the file path is correctly formatted)
-output_file = os.path.join(data_folder, 'preprocessed/average_metrics_updated.csv')
-average_metrics.to_csv(output_file, index=False)
-print("done solving S and zeta")
+average_metrics.to_csv(data_folder + '/preprocessed/average_metrics_updated.csv', index = False) # Export for later use
+print("done solving S and zetai")
+
+
+# print("Calculating S and zeta")
+
+# def equation_vol_skew(p, *args): # Defines the equations
+#     Si, zetai = p
+#     volatility, skewness = args
+#     if Si <= 0: # Ensure that Si is strictly positive
+#         return [1e6, 1e6]
+#     eq1 = ((nu/(nu-2) * Si + ((2 * nu ** 2) / ((nu-2)**2 * (nu-4))) * zetai**2) ** 0.5) - volatility
+#     expr = ((2 * nu * zetai ** 2) / Si + (nu - 2) * (nu - 4)) #part of the denominator of skewness formula
+#     if expr < 0: #must be positive to avoid complex numbers when taking the power of 3/2
+#         return [1e6, 1e6]
+#     eq2 = ((2 * zetai * sqrt(nu * (nu - 4)) /
+#             (sqrt(Si) * (expr) ** (3/2))) *
+#            (3 * (nu - 2) + (8 * nu * zetai ** 2) / (Si * (nu - 6)))) - skewness
+#     return [eq1, eq2]
+
+# def fsolve_si_zetai(volatility, skewness): # Attempts to solve for Si and zetai, with an initial guess (0.1, 0.1)
+#     Si, zetai = fsolve(equation_vol_skew, (0.1, 0.1), args=(volatility, skewness))
+#     return Si, zetai
+
+# average_metrics['Si'], average_metrics['zetai'] = zip(*average_metrics.apply(
+#     lambda x: fsolve_si_zetai(x.volatility, x.skewness), axis=1))
+
+# average_metrics['portfolio'] = ['DI', 'HY', 'IG']
+# average_metrics.to_csv(os.path.join(data_folder, 'preprocessed/average_metrics_updated.csv'), index=False)
+# print("done solving S and zeta")
+
+
+
+
+# # Empirical target values for DI bonds (from your CSV)
+# vol_target = 0.1011781287870689    # empirical volatility (in decimals)
+# skew_target = 0.0193250587179916    # empirical skewness
+
+# # Set the degree-of-freedom parameter nu (as used in the model)
+
+# # Define the function returning the residuals for the two equations
+# def equation_vol_skew(p, *args):
+#     Si, zetai = p
+#     volatility, skewness = args
+    
+#     # Enforce Si > 0 to avoid invalid square roots
+#     if Si <= 0:
+#         return [1e6, 1e6]
+    
+#     # Equation 1: difference between theoretical and empirical volatility
+#     theo_std = ((nu/(nu-2) * Si + ((2 * nu**2) / ((nu-2)**2 * (nu-4))) * zetai**2))**0.5
+#     eq1 = theo_std - volatility
+    
+#     # Intermediate expression for skewness calculation
+#     expr = ((2 * nu * zetai**2) / Si + (nu - 2) * (nu - 4))
+#     if expr < 0:
+#         return [1e6, 1e6]
+    
+#     # Equation 2: difference between theoretical and empirical skewness
+#     theo_skew = ((2 * zetai * sqrt(nu * (nu - 4))) /
+#                  (sqrt(Si) * (expr)**(3/2))) * (3 * (nu - 2) + (8 * nu * zetai**2) / (Si * (nu - 6)))
+#     eq2 = theo_skew - skewness
+    
+#     return [eq1, eq2]
+
+# # Create a grid of Si and zetai values.
+# # Adjust the ranges based on your expected solution region.
+# S_values = np.linspace(0.001, 0.2, 200)       # Example range for S_i
+# zeta_values = np.linspace(-0.1, 0.1, 200)       # Example range for ζ_i
+
+# S_grid, zeta_grid = np.meshgrid(S_values, zeta_values)
+
+# # Prepare arrays to store the residuals.
+# eq1_grid = np.zeros_like(S_grid)
+# eq2_grid = np.zeros_like(S_grid)
+
+# # Loop over the grid to compute residuals at each (Si, ζ_i)
+# for i in range(S_grid.shape[0]):
+#     for j in range(S_grid.shape[1]):
+#         Si_val = S_grid[i, j]
+#         zeta_val = zeta_grid[i, j]
+        
+#         if Si_val <= 0:
+#             eq1_grid[i, j] = 1e6
+#             eq2_grid[i, j] = 1e6
+#             continue
+        
+#         theo_std = ((nu/(nu-2) * Si_val + ((2 * nu**2) / ((nu-2)**2 * (nu-4))) * zeta_val**2))**0.5
+#         eq1_val = theo_std - vol_target
+        
+#         expr_val = ((2 * nu * zeta_val**2) / Si_val + (nu - 2) * (nu - 4))
+#         if expr_val < 0:
+#             eq1_grid[i, j] = 1e6
+#             eq2_grid[i, j] = 1e6
+#             continue
+        
+#         theo_skew = ((2 * zeta_val * sqrt(nu * (nu - 4))) /
+#                      (sqrt(Si_val) * (expr_val)**(3/2))) * (3 * (nu - 2) + (8 * nu * zeta_val**2) / (Si_val * (nu - 6)))
+#         eq2_val = theo_skew - skew_target
+        
+#         eq1_grid[i, j] = eq1_val
+#         eq2_grid[i, j] = eq2_val
+
+# # --- Plotting the Residuals ---
+# plt.figure(figsize=(14, 6))
+
+# # Plot for Equation 1 (Volatility difference)
+# plt.subplot(1, 2, 1)
+# contour1 = plt.contourf(S_grid, zeta_grid, eq1_grid, levels=50, cmap='coolwarm', vmin=-0.01, vmax=0.01)
+# plt.colorbar(contour1)
+# # Add an explicit contour line at 0 (eq1 = 0)
+# zero_contour1 = plt.contour(S_grid, zeta_grid, eq1_grid, levels=[0], colors='black', linewidths=2)
+# plt.clabel(zero_contour1, fmt='eq1=0', fontsize=10)
+# plt.title('Residual of Equation 1 (Theoretical Std - Empirical Vol)')
+# plt.xlabel('$S_i$')
+# plt.ylabel('$\\zeta_i$')
+
+# # Plot for Equation 2 (Skewness difference)
+# plt.subplot(1, 2, 2)
+# contour2 = plt.contourf(S_grid, zeta_grid, eq2_grid, levels=50, cmap='coolwarm', vmin=-0.01, vmax=0.01)
+# plt.colorbar(contour2)
+# # Add an explicit contour line at 0 (eq2 = 0)
+# zero_contour2 = plt.contour(S_grid, zeta_grid, eq2_grid, levels=[0], colors='black', linewidths=2)
+# plt.clabel(zero_contour2, fmt='eq2=0', fontsize=10)
+# plt.title('Residual of Equation 2 (Theoretical Skew - Empirical Skew)')
+# plt.xlabel('$S_i$')
+# plt.ylabel('$\\zeta_i$')
+
+# plt.tight_layout()
+# plt.show()
