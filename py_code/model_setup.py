@@ -434,17 +434,18 @@ final_monthly_df.to_csv(os.path.join(data_folder, "preprocessed", "final_monthly
 print("Final monthly dataset created.")
 
 
-# # =============================================================================
-# #                     h.  Obtaining average values 
-# # =============================================================================
-# print("Obtaining average values for each bond portfolio...")
-# average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
-# print("Average metrics per bond portfolio:")
-# print(average_metrics)
+# =============================================================================
+#                     h.  Obtaining average values 
+# =============================================================================
+print("Obtaining average values for each bond portfolio...")
+average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
+average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
+print("Average metrics per bond portfolio:")
+print(average_metrics)
 
-# median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
-# print("Median metrics per bond portfolio:")
-# print(median_metrics)
+median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
+print("Median metrics per bond portfolio:")
+print(median_metrics)
 
 # =============================================================================
 #               i. Checking the accuracy of the CGO calculations 
