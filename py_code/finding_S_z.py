@@ -84,32 +84,72 @@ thetas_df.to_csv(data_folder + '/preprocessed/thetas_df.csv') # Export for later
 # ======================================================================================================================
 print("Calculating S and zeta")
 
-def equation_vol_skew(p,*args): # Defines the equations 
-    Si, zetai = p
-    volatility, skewness = args
-    if Si <= 0:
-        return [1e6, 1e6]
-    return[(nu/(nu-2) * Si + ((2 * nu ** 2) / ((nu-2)**2 * (nu-4))) * zetai**2) ** (0.5) - volatility,
-                ((2 * zetai * sqrt(nu * (nu - 4)) /
-                (sqrt(Si) * ((2 * nu * zetai ** 2) / Si + (nu - 2) * (nu - 4)) ** (3 / 2)))
-                * (3 * (nu - 2) + (8 * nu * zetai ** 2) / (Si * (nu - 6))))- skewness]
+# Define the function for the system of equations
+def equation_system(params, nu, sigma, skew):
+    Si, zeta = params
+    eq1 = sqrt((nu / (nu - 2)) * Si + (2 * nu**2) / ((nu - 2)**2 * (nu - 4)) * zeta**2) - sigma
+    eq2 = ((2 * zeta * sqrt(nu * (nu - 4))) /
+           (sqrt(Si) * ((2 * nu * zeta**2) / Si + (nu - 2) * (nu - 4))**(3 / 2))) * \
+          (3 * (nu - 2) + (8 * nu * zeta**2) / (Si * (nu - 6))) - skew
+    return [eq1, eq2]
+
+# Define a wrapper function to solve the system given nu, sigma, and skew
+def solve_equations(nu, sigma, skew):
+    # Initial guesses for Si and zeta
+    initial_guess = [0.001, 0.001]
+    
+    # Solve the equations using fsolve
+    solution = fsolve(equation_system, initial_guess, args=(nu, sigma, skew))
+    
+    # Return the solution as a tuple (Si, zeta)
+    return solution
+
+# Initialize lists to store Si and zeta values
+Si_values = []
+zeta_values = []
+
+# Compute Si and zeta for each row
+for index, row in average_metrics.iterrows():
+    sigma = row["volatility"]
+    skewR = row["skewness"]
+    Si, zeta = solve_equations(nu, sigma, skewR)
+    Si_values.append(Si)
+    zeta_values.append(zeta)
+
+# Add the new columns to the dataframe
+average_metrics["Si"] = Si_values
+average_metrics["zeta"] = zeta_values
+
+# Create the updated dataframe
+average_metrics_updated = average_metrics.copy()
+print(average_metrics_updated)
+
+# def equation_vol_skew(p,*args): # Defines the equations 
+#     Si, zetai = p
+#     volatility, skewness = args
+#     if Si <= 0:
+#         return [1e6, 1e6]
+#     return[(nu/(nu-2) * Si + ((2 * nu ** 2) / ((nu-2)**2 * (nu-4))) * zetai**2) ** (0.5) - volatility,
+#                 ((2 * zetai * sqrt(nu * (nu - 4)) /
+#                 (sqrt(Si) * ((2 * nu * zetai ** 2) / Si + (nu - 2) * (nu - 4)) ** (3 / 2)))
+#                 * (3 * (nu - 2) + (8 * nu * zetai ** 2) / (Si * (nu - 6))))- skewness]
 
 
-def fsolve_si_zetai(volatility, skewness): # Attempts to find values of Si and zetai that satisfy equation_std_skew.
-    Si, zetai = fsolve(equation_vol_skew,(0.2, 0.2),args=(volatility, skewness))
-    # return {'Si':Si, 'zetai':zetai}
-    return Si, zetai
+# def fsolve_si_zetai(volatility, skewness): # Attempts to find values of Si and zetai that satisfy equation_std_skew.
+#     Si, zetai = fsolve(equation_vol_skew,(0.2, 0.2),args=(volatility, skewness))
+#     # return {'Si':Si, 'zetai':zetai}
+#     return Si, zetai
 
 
-start = timeit.default_timer()
-average_metrics['Si'], average_metrics['zetai'] = zip(*average_metrics.apply(lambda x: fsolve_si_zetai(x.volatility, x.skewness), axis=1))
+# start = timeit.default_timer()
+# average_metrics['Si'], average_metrics['zetai'] = zip(*average_metrics.apply(lambda x: fsolve_si_zetai(x.volatility, x.skewness), axis=1))
 
-stop = timeit.default_timer()
-execution_time = stop - start
-print(f"Program Executed in {execution_time} seconds")  # Returns time in seconds
+# stop = timeit.default_timer()
+# execution_time = stop - start
+# print(f"Program Executed in {execution_time} seconds")  # Returns time in seconds
 
-average_metrics.to_csv(data_folder + '/preprocessed/average_metrics_updated.csv', index = False) # Export for later use
-print("done solving S and zetai")
+# average_metrics.to_csv(data_folder + '/preprocessed/average_metrics_updated.csv', index = False) # Export for later use
+# print("done solving S and zetai")
 
 
 # print("Calculating S and zeta")

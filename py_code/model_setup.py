@@ -15,6 +15,7 @@ import matplotlib.dates as mdates
 import matplotlib.cm as cm
 import seaborn as sns
 from scipy.stats import skew
+from datetime import datetime
 
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
@@ -23,8 +24,9 @@ figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
 bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = bond_data[['eom', 'cusip', 'ret_exc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom_past']]
+model_data = bond_data[['eom', 'cusip', 'ret_exc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom', 'price_eom_past', 'offering_date']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
+model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
 
 # ===================================================================    
@@ -266,7 +268,7 @@ def compute_effective_purchase_price_exponential_earliest(group):
     """
     group = group.sort_values('eom').copy()
     
-    effective_prices = [group.iloc[0]['price_eom_past']]
+    effective_prices = [group.iloc[0]['price_eom']]
     cgo_values = [0.0]
 
     
@@ -290,29 +292,24 @@ def compute_effective_purchase_price_exponential_earliest(group):
         
         # The i-th row in group corresponds to the 'current' date
         # The 'past_prices' are the prices from index 0..(i-1)
-        past_prices = group.iloc[:i]['price_eom_past'].values
+        past_prices = group.iloc[:i]['price_eom'].values
 
          # Apply the condition to adjust price_eom for k=0
-        #if group.iloc[0]['offering_date'] < '2002-07-31':
-            #past_prices[0] = 100
+        if group.iloc[0]['offering_date'] < datetime(2002, 7, 31):
+            past_prices[0] = 100
         
         # Weighted sum of the past prices
         effective_price = np.sum(weights * past_prices)
         effective_prices.append(effective_price)
         
         # Current price is the price at row i
-        current_price = group.iloc[i]['price_eom_past']
+        current_price = group.iloc[i]['price_eom']
         cgo = (current_price / effective_price - 1) * 100
         cgo_values.append(cgo)
     
     group['effective_price'] = effective_prices
     group['cap_gain_overhang'] = cgo_values
     return group
-
-#offering_date = pd.read_csv(data_folder + "/raw/all_wrds_data.csv")
-#offering_data = offering_date.columns.str.lower()
-#offering_date = offering_date[['eom', 'cusip', 'offering_date']]
-#model_data = model_data.merge(offering_date, on=['eom', 'cusip'], how='left')
 
 print('Applying the function group-wise by bond (cusip) ...')
 model_data = model_data.sort_values(['cusip', 'eom'])
@@ -461,67 +458,67 @@ print(median_metrics)
 # -------------------------------
 # 2. Distribution Visualization
 # -------------------------------
-# cmap = cm.get_cmap('GnBu', 5).reversed()
-# model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
-# model_data_cgo['eom'] = pd.to_datetime(model_data_cgo['eom'])
+cmap = cm.get_cmap('GnBu', 5).reversed()
+model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
+model_data_cgo['eom'] = pd.to_datetime(model_data_cgo['eom'])
 
-# # Histogram with KDE to inspect the overall distribution
-# plt.figure(figsize=(10, 6))
-# # We can pick a single color from the colormap, e.g. cmap(1)
-# sns.histplot(
-#     model_data_cgo['cap_gain_overhang'].dropna(),
-#     bins=50,
-#     kde=True,
-#     color=cmap(1)  # Using one color from the reversed colormap
-# )
-# plt.xlabel('Capital Gain Overhang (%)')
-# plt.title('Distribution of Capital Gain Overhang (using price_eom_past)')
-# plt.tight_layout()
-# plt.savefig(os.path.join(figures_folder, "cgo_distribution.png"))
-# plt.close()
+# Histogram with KDE to inspect the overall distribution
+plt.figure(figsize=(10, 6))
+# We can pick a single color from the colormap, e.g. cmap(1)
+sns.histplot(
+    model_data_cgo['cap_gain_overhang'].dropna(),
+    bins=50,
+    kde=True,
+    color=cmap(1)  # Using one color from the reversed colormap
+)
+plt.xlabel('Capital Gain Overhang (%)')
+plt.title('Distribution of Capital Gain Overhang (using price_eom_past)')
+plt.tight_layout()
+plt.savefig(os.path.join(figures_folder, "cgo_distribution.png"))
+plt.close()
 
-# # Boxplot by Portfolio to see differences across portfolios
-# unique_portfolios = sorted(model_data_cgo['portfolio'].dropna().unique())
-# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+# Boxplot by Portfolio to see differences across portfolios
+unique_portfolios = sorted(model_data_cgo['portfolio'].dropna().unique())
+palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
 
-# plt.figure(figsize=(10, 6))
-# sns.boxplot(
-#     data=model_data_cgo,
-#     x='portfolio',
-#     y='cap_gain_overhang',
-#     order=unique_portfolios,       # ensure consistent order
-#     palette=palette_colors         # use our custom palette
-# )
-# plt.title('Capital Gain Overhang by Portfolio')
-# plt.xlabel('Portfolio')
-# plt.ylabel('Capital Gain Overhang (%)')
-# plt.tight_layout()
-# plt.savefig(os.path.join(figures_folder, "cgo_boxplot_by_portfolio.png"))
-# plt.close()
+plt.figure(figsize=(10, 6))
+sns.boxplot(
+    data=model_data_cgo,
+    x='portfolio',
+    y='cap_gain_overhang',
+    order=unique_portfolios,       # ensure consistent order
+    palette=palette_colors         # use our custom palette
+)
+plt.title('Capital Gain Overhang by Portfolio')
+plt.xlabel('Portfolio')
+plt.ylabel('Capital Gain Overhang (%)')
+plt.tight_layout()
+plt.savefig(os.path.join(figures_folder, "cgo_boxplot_by_portfolio.png"))
+plt.close()
 
-# # -------------------------------
-# # 3. Time Series Visualization
-# # -------------------------------
+# -------------------------------
+# 3. Time Series Visualization
+# -------------------------------
 
-# # Calculate the average capital gain overhang for each month and portfolio.
-# portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
-# unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
-# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+# Calculate the average capital gain overhang for each month and portfolio.
+portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
+unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
+palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
 
-# plt.figure(figsize=(12, 6))
-# for i, portfolio in enumerate(unique_portfolios):
-#     sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
-#     plt.plot(
-#         sub_df['eom'], sub_df['cap_gain_overhang'],
-#         marker='o',
-#         label=portfolio,
-#         color=palette_colors[i]
-#     )
-# plt.xlabel('Date (eom)')
-# plt.ylabel('Average Capital Gain Overhang (%)')
-# plt.title('Monthly Average Capital Gain Overhang by Portfolio')
-# plt.xticks(rotation=45)
-# plt.legend()
-# plt.tight_layout()
-# plt.savefig(os.path.join(figures_folder, "monthly_cgo_by_portfolio.png"))
-# plt.close()
+plt.figure(figsize=(12, 6))
+for i, portfolio in enumerate(unique_portfolios):
+    sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
+    plt.plot(
+        sub_df['eom'], sub_df['cap_gain_overhang'],
+        marker='o',
+        label=portfolio,
+        color=palette_colors[i]
+    )
+plt.xlabel('Date (eom)')
+plt.ylabel('Average Capital Gain Overhang (%)')
+plt.title('Monthly Average Capital Gain Overhang by Portfolio')
+plt.xticks(rotation=45)
+plt.legend()
+plt.tight_layout()
+plt.savefig(os.path.join(figures_folder, "monthly_cgo_by_portfolio.png"))
+plt.close()

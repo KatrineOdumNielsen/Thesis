@@ -38,7 +38,7 @@ from scipy.special import kv
 # Directory set up
 project_dir = os.getcwd() # Change to your project directory
 data_folder = project_dir + "/data"
-os.chdir(project_dir + "/_temp")
+os.chdir(project_dir + "_temp")
 
 
 #%% Set parameters
@@ -117,3 +117,4 @@ print("Program Executed in "+str(execution_time)) # It returns time in seconds
 
 momr_std_skew.to_csv(data_folder + '/momr_avg_std_skew_Si_xi_all.csv') # Export to allow julia to read
 print("done solving S and xi")
+print(momr_std_skew.head())

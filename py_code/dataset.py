@@ -58,7 +58,7 @@ bond_descriptive_data = wrds_data[wrds_data['eom'] <= "2021-11-30"]
 columns_to_keep_descriptive = [
     'eom', 'cusip', 'bond_type', 'size', 'amount_outstanding', 'coupon', 
     'rating_num', 'rating_cat', 'rating_class', 'wrds_yield', 'price_eom', 
-    'ret_eom', 'tmt', 'duration'
+    'ret_eom', 'tmt', 'duration', 'offering_date'
 ]
 bond_descriptive_data_subset = bond_descriptive_data[columns_to_keep_descriptive]
 
