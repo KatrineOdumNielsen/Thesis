@@ -24,11 +24,13 @@ figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
 bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = bond_data[['eom', 'cusip', 'ret_exc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom', 'price_eom_past', 'offering_date']]
+model_data = bond_data[['eom', 'cusip', 'ret_exc', 'ret_texc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom', 'price_eom_past', 'offering_date']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
 
+#================================== TEST - MAYBE REMOVE============================================
+model_data['ret_exc'] = model_data['ret_texc']
 # ===================================================================    
 #                     a. Set up portfolios by month        
 # ===================================================================
@@ -178,19 +180,19 @@ print("Done calculating rolling betas")
 # --- Plot the Rolling Betas for Each Portfolio ---
 cmap = cm.get_cmap('GnBu', 5).reversed()
 
-# plt.figure(figsize=(10, 6))
-# for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
-#     sub_df = beta_df[beta_df['portfolio'] == portfolio]
-#     plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
-# plt.xlabel("End-of-Month (eom)")
-# plt.ylabel("Rolling Beta")
-# plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
-# plt.legend()
-# plt.xticks(rotation=45)
-# plt.grid(True)
-# plt.tight_layout()
-# plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
-# plt.close()
+plt.figure(figsize=(10, 6))
+for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
+    sub_df = beta_df[beta_df['portfolio'] == portfolio]
+    plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
+plt.xlabel("End-of-Month (eom)")
+plt.ylabel("Rolling Beta")
+plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
+plt.legend()
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
+plt.close()
 
 # ===================================================================    
 #           e.  Calculate capital gain overhang  (CGO)      
