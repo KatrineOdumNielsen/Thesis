@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Julia: Debug My Script",
+        "type": "jl",
+        "request": "launch",
+        "program": "${workspaceFolder}/your_script.jl",
+        "stopOnEntry": false,
+        "disableSteppingInJuliaInternals": true,
+        "args": []
+      }
+    ]
+  }

@@ -80,7 +80,7 @@ S_i = average_metrics_updated.Si
 zeta_i = average_metrics_updated.zeta
 
 Ri = 0.01
-mu = 0.005 ### Er defineret her, men er ikke brugt i modellen??? ###
+mu = 0.005
 
 # ===================================================================    
 #                     b. Calculate μ̂ and θ̂        
@@ -90,7 +90,7 @@ mu = 0.005 ### Er defineret her, men er ikke brugt i modellen??? ###
 
 # ------ Define model functions ------
 # Define function p_Ri (the density function)
-function p_Ri(Ri, mu, Si, zetai)
+function p_Ri(Ri, mu, Si, zetai, nu)
     N = 1
     Kl = besselk((nu + N) / 2, sqrt((nu + ((Ri - mu) ^ 2)/Si) * (zetai^2) /Si))
 
@@ -100,141 +100,160 @@ function p_Ri(Ri, mu, Si, zetai)
 end
 
 # Define P_Ri (the cumulative distribution function)
-function P_Ri(x, mu, Si, zetai)
-    integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-8)
+function P_Ri(x, mu, Si, zetai, nu)
+    integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai, nu), -Inf, x, rtol=1e-8)
     return integral
 end
 
 
 # Define dwP_Ri (derivative term for negative side)
-function dwP_Ri(x, mu, Si, zetai)
-    P = P_Ri(x, mu, Si, zetai)
+function dwP_Ri(x, mu, Si, zetai, δ, nu)
+    P = P_Ri(x, mu, Si, zetai, nu)
     # dwP_Ri = ((δ * P**(δ-1) * (P**δ + (1-P)**δ))
     #           - P**δ * (P**(δ-1) - (1-P)**(δ-1))) / \
     #          ((P**δ + (1-P)**δ)**(1+1/δ)) * p_Ri(Ri, mu, Si, zetai)
 
-    return ((δ * P^(δ-1) * (P^δ + (1-P)^δ)) - P^δ * (P^(δ-1) - (1-P)^(δ-1))) /((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(x, mu, Si, zetai)
+    epsilon = 1e-13
+    #if P < epsilon
+    #    println("Clamping P at x=", x, ": original P=", P)
+    #    P = epsilon
+    #end
+    if P > 1
+        println("Clamping P at x=", x, ": original P=", P)
+        P = 1
+    end
+
+    return ((δ * P^(δ-1) * (P^δ + (1-P)^δ)) - P^δ * (P^(δ-1) - (1-P)^(δ-1))) /((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(x, mu, Si, zetai, nu)
 end
 
 # Define dwP_1_Ri (derivative term for positive side)
-function dwP_1_Ri(Ri, mu, Si, zetai)
-    P = P_Ri(Ri, mu, Si, zetai)
-    result = -((δ * (1-P)^(δ-1) * (P^δ + (1-P)^δ)) - (1-P)^δ * ((1-P)^(δ-1) - P^(δ-1))) / ((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(Ri, mu, Si, zetai)
+function dwP_1_Ri(Ri, mu, Si, zetai, δ, nu)
+    P = P_Ri(Ri, mu, Si, zetai, nu)
+
+    if P > 1
+        println("Clamping P at x=", Ri, ": original P=", P)
+        P = 1
+    end
+
+    result = -((δ * (1-P)^(δ-1) * (P^δ + (1-P)^δ)) - (1-P)^δ * ((1-P)^(δ-1) - P^(δ-1))) / ((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(Ri, mu, Si, zetai, nu)
 
     return result
 end
 
 
 # Define neg_integral (integral for the negative part of the function)
-function neg_integral(mu, Si, zetai, gi, theta_mi,theta_i_minus1)
-    integral, err = quadgk(x -> ((theta_mi * (Rf-x) - theta_i_minus1 * gi) ^(α-1))* (Rf-x) * dwP_Ri(x, mu, Si, zetai), -100, Rf-theta_i_minus1*gi/theta_mi, rtol=1e-8)
+function neg_integral(mu, Si, zetai, gi, theta_mi,theta_i_minus1, Rf, α, δ, nu)
+    println(Rf-theta_i_minus1*gi/theta_mi)
+    integral, err = quadgk(x -> ((theta_mi * (Rf-x) - theta_i_minus1 * gi) ^(α-1))* (Rf-x) * dwP_Ri(x, mu, Si, zetai, δ, nu), -100, 9, rtol=1e-8)
+
+    #integral1, err = quadgk(x -> ((theta_mi * (Rf-x) - theta_i_minus1 * gi) ^(α-1))* (Rf-x) * dwP_Ri(x, mu, Si, zetai, δ, nu), 0, Rf-theta_i_minus1*gi/theta_mi-1, rtol=1e-8)
 
     return integral
 end
 
 # Define pos_integral (integral for the positive part of the function)
-function pos_integral(mu, Si, zetai, gi, theta_mi,theta_i_minus1)
-    integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * gi) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*gi/theta_mi, 100, rtol=1e-8)
+function pos_integral(mu, Si, zetai, gi, theta_mi,theta_i_minus1, Rf, α, δ, nu)
+    integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * gi) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai, δ, nu), -100, 9, rtol=1e-8)
+    #integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * gi) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai, δ, nu), Rf-theta_i_minus1*gi/theta_mi, 100, rtol=1e-8)
 
     return integral
 end
 
 
-# Define neg_integral in Equation 20 (negative part of equation 20)
-function neg_integral20(θᵢ, mu, Si, zetai, gi,theta_i_minus1,lamb, b0)
-    if θᵢ >= 0
-        integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * gi ) ^(α)) * dwP_Ri(x, mu, Si, zetai), -100, Rf-theta_i_minus1*gi/θᵢ, rtol=1e-8)
-    elseif θᵢ < 0
-        integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * gi) ^(α)) * dwP_Ri(x, mu, Si, zetai), -100, Rf-theta_i_minus1*gi/θᵢ, rtol=1e-8)
-    end
-
-    return integral
-end
-
-# Define pos_integral in Equation 20 (positive part of equation 20)
-function pos_integral20(θᵢ, mu, Si, zetai, gi,theta_i_minus1,lamb, b0)
-    if θᵢ >= 0
-        integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * gi) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*gi/θᵢ, 100, rtol=1e-8)
-    elseif θᵢ < 0
-        integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * gi ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*gi/θᵢ, 100, rtol=1e-8)
-    end
-
-    return integral
-end
-
-############## TRYING WITH SAFEGUARDS ################
-# # Simplified safeguarded version for the negative side of Equation20
-# function neg_integral20(θ, mu, Si, zetai, gi, theta_i_minus1, lamb, b0)
-#     # If θ or Si is near zero, return 0.0 to avoid division problems.
-#     if abs(θ) < 1e-8 || abs(Si) < 1e-8
-#         return 0.0
+# # Define neg_integral in Equation 20 (negative part of equation 20)
+# function neg_integral20(θᵢ, mu, Si, zetai, gi,theta_i_minus1,lamb, b0)
+#     if θᵢ >= 0
+#         integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * gi ) ^(α)) * dwP_Ri(x, mu, Si, zetai), -100, Rf-theta_i_minus1*gi/θᵢ, rtol=1e-8)
+#     elseif θᵢ < 0
+#         integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * gi) ^(α)) * dwP_Ri(x, mu, Si, zetai), -100, Rf-theta_i_minus1*gi/θᵢ, rtol=1e-8)
 #     end
-#     # Compute integration limit
-#     limit = Rf - theta_i_minus1 * gi / θ
-#     if isnan(limit) || isinf(limit)
-#         return 0.0
-#     end
-#     # Define the integrand; if the inner expression is negative, return 0.0.
-#     integrand(x) = begin
-#         expr = θ * (Rf - x) - theta_i_minus1 * gi
-#         if expr < 0
-#             0.0
-#         else
-#             (-lamb * b0 * expr^α) * dwP_Ri(x, mu, Si, zetai)
-#         end
-#     end
-#     # Try to integrate; if any error occurs or the result is not finite, return 0.0.
-#     try
-#         integral, _ = quadgk(integrand, -100, limit, rtol=1e-8)
-#         return isfinite(integral) ? integral : 0.0
-#     catch
-#         return 0.0
-#     end
+
+#     return integral
 # end
 
-# # Simplified safeguarded version for the positive side of Equation20
-# function pos_integral20(θ, mu, Si, zetai, gi, theta_i_minus1, lamb, b0)
-#     if abs(θ) < 1e-8 || abs(Si) < 1e-8
-#         return 0.0
+# # Define pos_integral in Equation 20 (positive part of equation 20)
+# function pos_integral20(θᵢ, mu, Si, zetai, gi,theta_i_minus1,lamb, b0)
+#     if θᵢ >= 0
+#         integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * gi) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*gi/θᵢ, 100, rtol=1e-8)
+#     elseif θᵢ < 0
+#         integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * gi ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*gi/θᵢ, 100, rtol=1e-8)
 #     end
-#     limit = Rf - theta_i_minus1 * gi / θ
-#     if isnan(limit) || isinf(limit)
-#         return 0.0
-#     end
-#     integrand(x) = begin
-#         expr = θ * (x - Rf) + theta_i_minus1 * gi
-#         if expr < 0
-#             0.0
-#         else
-#             (-b0 * expr^α) * dwP_1_Ri(x, mu, Si, zetai)
-#         end
-#     end
-#     try
-#         integral, _ = quadgk(integrand, limit, 100, rtol=1e-8)
-#         return isfinite(integral) ? integral : 0.0
-#     catch
-#         return 0.0
-#     end
+
+#     return integral
 # end
+
+############# TRYING WITH SAFEGUARDS ################
+# Simplified safeguarded version for the negative side of Equation20
+function neg_integral20(θᵢ, mu, Si, zetai, gi, theta_i_minus1, lamb, b0, α, Rf, δ, nu)
+    # If θ or Si is near zero, return 0.0 to avoid division problems.
+    if abs(θᵢ) < 1e-8 || abs(Si) < 1e-8
+        return 0.0
+    end
+    # Compute integration limit
+    limit = Rf - theta_i_minus1 * gi / θᵢ
+    if isnan(limit) || isinf(limit)
+        return 0.0
+    end
+    # Define the integrand; if the inner expression is negative, return 0.0.
+    integrand(x) = begin
+        expr = θᵢ * (Rf - x) - theta_i_minus1 * gi
+        if expr < 0
+            0.0
+        else
+            (-lamb * b0 * expr^α) * dwP_Ri(x, mu, Si, zetai, δ, nu)
+        end
+    end
+    # Try to integrate; if any error occurs or the result is not finite, return 0.0.
+    try
+        integral, _ = quadgk(integrand, -100, limit, rtol=1e-8)
+        return isfinite(integral) ? integral : 0.0
+    catch
+        return 0.0
+    end
+end
+
+# Simplified safeguarded version for the positive side of Equation20
+function pos_integral20(θᵢ, mu, Si, zetai, gi, theta_i_minus1, b0, Rf, α,  δ, nu)
+    if abs(θᵢ) < 1e-8 || abs(Si) < 1e-8
+        return 0.0
+    end
+    limit = Rf - theta_i_minus1 * gi / θᵢ
+    if isnan(limit) || isinf(limit)
+        return 0.0
+    end
+    integrand(x) = begin
+        expr = θᵢ * (x - Rf) + theta_i_minus1 * gi
+        if expr < 0
+            0.0
+        else
+            (-b0 * expr^α) * dwP_1_Ri(x, mu, Si, zetai, δ, nu)
+        end
+    end
+    try
+        integral, _ = quadgk(integrand, limit, 100, rtol=1e-8)
+        return isfinite(integral) ? integral : 0.0
+    catch
+        return 0.0
+    end
+end
 
 ###########################################################
 
 # Solve Equation 35 and get μ̂
-function Equation35(mu, zetai, Si, gi, theta_mi, theta_i_minus1, βi, σm, nu,Rf,γ̂, α, lamb, b0)
+function Equation35(mu, zetai, Si, gi, theta_mi, theta_i_minus1, βi, σm, nu,Rf,γ̂, α, lamb, b0, δ)
     term1 = (mu[1] + (nu * zetai / (nu-2) - Rf)) - γ̂ * βi * σm ^ 2
-    term2 = -α * lamb * b0 * neg_integral(mu[1], Si, zetai, gi,theta_mi,theta_i_minus1)
-    term3 = - α * b0 * pos_integral(mu[1], Si, zetai, gi,theta_mi,theta_i_minus1)
+    term2 = -α * lamb * b0 * neg_integral(mu[1], Si, zetai, gi,theta_mi,theta_i_minus1, Rf, α, δ, nu)
+    term3 = - α * b0 * pos_integral(mu[1], Si, zetai, gi,theta_mi,theta_i_minus1, Rf, α, δ, nu)
 
     return term1 + term2 + term3
 end
 
 
 # Equation 20 (entire objective function used for optimization)
-function Equation20(θᵢ,zetai,μ̂,nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi)
+function Equation20(θᵢ,zetai,μ̂,nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu)
     term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σi^2 + 2*θᵢ[1]*(βi*σm^2 - theta_mi * σi^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, gi,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, gi,theta_i_minus1,lamb, b0)
-
+    term2 =  neg_integral20(θᵢ[1], mu, Si, zetai, gi, theta_i_minus1, lamb, b0, α, Rf, δ, nu)
+    term3 =  pos_integral20(θᵢ[1], mu, Si, zetai, gi, theta_i_minus1, b0, Rf, α,  δ, nu)
     return -(term1 + term2 + term3)
 end
 
@@ -261,13 +280,13 @@ for j = 1:1#CHANGE TO 3
         theta_i_minus1 = theta_all.theta_i_minus1[j] / 780      #CHANGE BACK TO 3900
     end
 
-
+    
     println("Finding mu...")
-    results = nlsolve(mu -> Equation35(mu, zetai, Si, gi, theta_mi, theta_i_minus1, βi, σm, nu,Rf,γ̂, α, lamb, b0), [0.5])
+    results = nlsolve(mu -> Equation35(mu, zetai, Si, gi, theta_mi, theta_i_minus1, βi, σm, nu,Rf,γ̂, α, lamb, b0, δ), [0.5])
     μ̂[j] = results.zero[1]
     # Equation35(μ̂)
     println("Finding theta...")
-    result2 = optimize(θᵢ  -> Equation20(θᵢ,zetai,μ̂[j],nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi), -theta_mi, theta_mi*2)
+    result2 = optimize(θᵢ  -> Equation20(θᵢ,zetai,μ̂[j],nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu), -theta_mi, theta_mi*2)
     θ̂ᵢ[j] = Optim.minimizer(result2)[1]
 
 
@@ -298,10 +317,10 @@ println("Creating plots")
 # ------ Defining functions for plotting ------
 
 # Entire objective function
-function Equation20_plot(θᵢ, μ̂, nu, zetai, Rf, γ̂, βi, σm, theta_mi, theta_i_minus1, σi, lamb, b0, Si, gi)
+function Equation20_plot(θᵢ,zetai,μ̂,nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu)
     term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 * (θᵢ[1]^2 * σi^2 + 2*θᵢ[1]*(βi*σm^2 - theta_mi * σi^2))
-    term2 = neg_integral20(θᵢ[1], μ̂, Si, zetai, gi, theta_i_minus1, lamb, b0)
-    term3 = pos_integral20(θᵢ[1], μ̂, Si, zetai, gi, theta_i_minus1, lamb, b0)
+    term2 = neg_integral20(θᵢ[1], mu, Si, zetai, gi, theta_i_minus1, lamb, b0, α, Rf, δ, nu)
+    term3 = pos_integral20(θᵢ[1], mu, Si, zetai, gi, theta_i_minus1, b0, Rf, α,  δ, nu)
     return -(term1 + term2 + term3)
 end
 
@@ -315,11 +334,11 @@ function Equation20_MV(θᵢ,μ̂, nu, zetai, Rf, γ̂, βi, σm, theta_mi, σi)
 end
 
 # PT part of the objective function (only second and third terms)
-function Equation20_PT(θᵢ,μ̂, Si, zetai, gi,theta_i_minus1,lamb, b0)
+function Equation20_PT(θᵢ, Si, zetai, gi,theta_i_minus1,lamb, b0, mu, α, δ, Rf, nu)
 
     # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σi^2 + 2*θᵢ[1]*(β*σm^2 - theta_mi * σi^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, gi,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, gi,theta_i_minus1,lamb, b0)
+    term2 = neg_integral20(θᵢ[1], mu, Si, zetai, gi, theta_i_minus1, lamb, b0, α, Rf, δ, nu)
+    term3 = pos_integral20(θᵢ[1], mu, Si, zetai, gi, theta_i_minus1, b0, Rf, α,  δ, nu)
 
     return -(term2 + term3)
 end
@@ -348,9 +367,10 @@ for j in 1:1#CHANGE TO 3
     # Figure 3: Full Objective Function Plot
     # -------------------------------------
     θᵢ_rand = LinRange(0.000001,0.002,100)
-    u_rand = [Equation20_plot([θ],μ̂[j],nu,zetai,Rf, γ̂, βi, σm, theta_mi, theta_i_minus1, σi, lamb, b0, Si, gi) for θ in θᵢ_rand]
+    u_rand = [Equation20_plot([θ],zetai, μ̂[j],nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu) for θ in θᵢ_rand]
+
     θᵢ_rand_neg = LinRange(-0.001,-0.000001,100)
-    u_rand_neg = [Equation20_plot([θ],μ̂[j],nu,zetai,Rf, γ̂, βi, σm, theta_mi, theta_i_minus1, σi, lamb, b0, Si, gi) for θ in θᵢ_rand_neg]
+    u_rand_neg = [Equation20_plot([θ],zetai, μ̂[j],nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu) for θ in θᵢ_rand_neg]
 
     θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
     u_rand_all = [u_rand_neg; u_rand]
@@ -368,14 +388,14 @@ for j in 1:1#CHANGE TO 3
     # -------------------------------------
     # Evaluate the functions over a wider range
     θᵢ_rand = LinRange(0.000001,0.25,100)
-    u_rand = [Equation20_plot([θ], μ̂[j], nu, zetai, Rf, γ̂, βi, σm, theta_mi, theta_i_minus1, σi, lamb, b0, Si, gi) for θ in θᵢ_rand]    
+    u_rand = [Equation20_plot([θ],zetai, μ̂[j],nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu) for θ in θᵢ_rand]  
     MV_rand = [Equation20_MV([θ],μ̂[j], nu, zetai, Rf, γ̂, βi, σm, theta_mi, σi) for θ in θᵢ_rand]
-    PT_rand = [Equation20_PT([θ],μ̂[j], Si, zetai, gi,theta_i_minus1,lamb, b0) for θ in θᵢ_rand]
+    PT_rand = [Equation20_PT([θ], Si, zetai, gi,theta_i_minus1,lamb, b0,mu, α, δ, Rf, nu) for θ in θᵢ_rand]
 
     θᵢ_rand_neg = LinRange(-0.01,-0.00001,100)
-    u_rand_neg = [Equation20_plot([θ],μ̂[j],nu, zetai, Rf, γ̂, βi, σm, theta_mi, theta_i_minus1, σi, lamb, b0, Si, gi) for θ in θᵢ_rand_neg]
+    u_rand_neg = [Equation20_plot([θ],zetai, μ̂[j],nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,γ̂, lamb, b0,Si,gi, α, δ, mu) for θ in θᵢ_rand_neg]
     MV_rand_neg = [Equation20_MV([θ],μ̂[j], nu, zetai, Rf, γ̂, βi, σm, theta_mi, σi) for θ in θᵢ_rand_neg]
-    PT_rand_neg = [Equation20_PT([θ],μ̂[j], Si, zetai, gi,theta_i_minus1,lamb, b0) for θ in θᵢ_rand_neg]
+    PT_rand_neg = [Equation20_PT([θ], Si, zetai, gi,theta_i_minus1,lamb, b0,mu, α, δ, Rf, nu) for θ in θᵢ_rand_neg]
 
     θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
     u_rand_all = [u_rand_neg; u_rand]
