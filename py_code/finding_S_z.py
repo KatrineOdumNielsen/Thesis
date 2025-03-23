@@ -45,10 +45,14 @@ print("\nAverage proportions across all months:")
 print(avg_portfolio_props)
 
 #Rounds the average proportions to even numbers
-N = 5000
-pr_DI = 150
-pr_HY = 950
-pr_IG = 3900
+N = 1000
+pr_DI = 30
+pr_HY = 190
+pr_IG = 780
+# N = 5000
+# pr_DI = 150
+# pr_HY = 950
+# pr_IG = 3900
 
 # For each month and portfolio, sum the market_value_past
 monthly_mv = (model_data_cgo.groupby(['eom', 'portfolio'])['market_value_past'].sum().reset_index()) #Finds the total market value of each portfolio during that month
@@ -123,6 +127,7 @@ average_metrics["zeta"] = zeta_values
 # Create the updated dataframe
 average_metrics_updated = average_metrics.copy()
 print(average_metrics_updated)
+average_metrics_updated.to_csv(data_folder + '/preprocessed/average_metrics_updated.csv', index=False)
 
 # def equation_vol_skew(p,*args): # Defines the equations 
 #     Si, zetai = p
