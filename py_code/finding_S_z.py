@@ -28,7 +28,6 @@ average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics.csv")
 #                     a. Set up known parameters        
 # ===================================================================
 nu = 17
-sigma_m = 0.25
 Rf = 1
 gamma_hat, b0 = (0.6, 0.6)
 alpha, delta, lamb = (0.7, 0.65, 1.5)

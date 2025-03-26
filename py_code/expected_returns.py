@@ -28,8 +28,8 @@ theta_all = pd.read_csv(os.path.join(project_folder, "data", "preprocessed", "th
 average_metrics_updated = pd.read_csv(os.path.join(project_folder, "data", "preprocessed", "average_metrics_updated.csv"))
 
 # Set parameters (adjusted as in your code)
-nu   = 17         # was 7.5
-sigma_m = 0.05    # was 0.25
+nu   = 7.5         # was 7.5
+sigma_m = 0.02    # was 0.25
 Rf   = 1
 
 gamma_hat, b0 = 0.6, 0.6
@@ -49,55 +49,41 @@ mu_global = 0.0005  # was 0.005
 #                     b. Calculate μ̂ and θ̂        
 # ===================================================================
 # For each portfolio we’ll store the results in arrays
-mu_hat = np.zeros(3)
-theta_hat = np.zeros(3)
+mu = np.zeros(3)
+theta = np.zeros(3)
 
 # -------------------------
 # Define model functions
 # -------------------------
 
-def p_Ri(Ri_val, mu, Si, zetai, nu):
+def p_Ri(Ri, mu, Si, zetai, nu, gamma):
     """Probability density function p_Ri."""
     N = 1
     # Compute the argument for the Bessel function
-    arg = (nu + ((Ri_val - mu)**2) / Si) * ((zetai**2)/Si)
+    arg = (nu + ((Ri - mu)**2) / Si) * ((zetai**2)/Si)
     Kl = kv((nu + N)/2, np.sqrt(arg))
-    result = (2**(1 - (nu+N)/2)) / (gamma(nu/2) * ((np.pi*nu)**(N/2)) * (np.abs(Si)**0.5))
-    result *= Kl * np.exp(((Ri_val - mu)/Si)*zetai)
-    result /= ((np.sqrt(arg))**(-(nu+N)/2)) * ((1 + (Ri_val - mu)**2/(Si*nu))**((nu+N)/2))
+    result = (2**(1 - (nu+N)/2)) / (gamma(nu/2) * ((np.pi*nu*Si)**(N/2)))
+    result *= Kl * np.exp(((Ri - mu)/Si)*zetai)
+    result /= ((np.sqrt(arg))**(-(nu+N)/2)) * ((1 + (Ri - mu)**2/(Si*nu))**((nu+N)/2))
     return result
 
 def P_Ri(x, mu, Si, zetai, nu):
     """Cumulative distribution function P_Ri, integrated from -inf to x."""
-    integral, err = quad(lambda Ri_val: p_Ri(Ri_val, mu, Si, zetai, nu), -np.inf, x, epsrel=1e-8)
+    integral, err = quad(lambda Ri: p_Ri(Ri, mu, Si, zetai, nu, gamma), -np.inf, x, epsrel=1e-8)
     return integral
 
 def dwP_Ri(x, mu, Si, zetai, delta, nu):
     """Derivative term for the negative side."""
     P = P_Ri(x, mu, Si, zetai, nu)
-    ## Clamp P to [0,1] if needed ##
-    # epsilon = 1e-10
-    # if P < epsilon:
-    #     # Debug message:
-    #     print(f"Clamping P at x={x}: original P={P}")
-    #     P = epsilon
-    # if P > 1:
-    #     print(f"Clamping P at x={x}: original P={P}")
-    #     P = 1
-    p_val = p_Ri(x, mu, Si, zetai, nu)
+    p_val = p_Ri(x, mu, Si, zetai, nu, gamma)
     numerator = (delta * P**(delta-1) * (P**delta + (1-P)**delta)) - P**delta * (P**(delta-1) - (1-P)**(delta-1))
     denominator = (P**delta + (1-P)**delta)**(1+1/delta)
     return numerator/denominator * p_val
 
-def dwP_1_Ri(Ri_val, mu, Si, zetai, delta, nu):
+def dwP_1_Ri(Ri, mu, Si, zetai, delta, nu):
     """Derivative term for the positive side."""
-    P = P_Ri(Ri_val, mu, Si, zetai, nu)
-    # epsilon = 1e-10
-    # if P < epsilon:
-    #     P = epsilon
-    # if P > 1:
-    #     P = 1
-    p_val = p_Ri(Ri_val, mu, Si, zetai, nu)
+    P = P_Ri(Ri, mu, Si, zetai, nu)
+    p_val = p_Ri(Ri, mu, Si, zetai, nu, gamma)
     result = -((delta * (1-P)**(delta-1) * (P**delta + (1-P)**delta)) - (1-P)**delta * ((1-P)**(delta-1) - P**(delta-1)))
     result /= (P**delta + (1-P)**delta)**(1+1/delta)
     return result * p_val
@@ -105,80 +91,74 @@ def dwP_1_Ri(Ri_val, mu, Si, zetai, delta, nu):
 def neg_integral(mu, Si, zetai, gi, theta_mi, theta_i_minus1, Rf, alpha, delta, nu):
     """Integral for the negative part."""
     # integration limits: from -100 to (Rf - theta_i_minus1*gi/theta_mi)
-    upper_limit = Rf - theta_i_minus1*gi/theta_mi
+    ## upper_limit = Rf - theta_i_minus1*gi/theta_mi ##
+    upper_limit = 0
     integrand = lambda x: ((theta_mi*(Rf-x) - theta_i_minus1*gi)**(alpha-1)) * (Rf-x) * dwP_Ri(x, mu, Si, zetai, delta, nu)
     integral, err = quad(integrand, -100, upper_limit, epsrel=1e-8)
     return integral
 
 def pos_integral(mu, Si, zetai, gi, theta_mi, theta_i_minus1, Rf, alpha, delta, nu):
     """Integral for the positive part."""
-    lower_limit = Rf - theta_i_minus1*gi/theta_mi
+    ##lower_limit = Rf - theta_i_minus1*gi/theta_mi
+    lower_limit = 0
     integrand = lambda x: ((theta_mi*(x-Rf) + theta_i_minus1*gi)**(alpha-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai, delta, nu)
     integral, err = quad(integrand, lower_limit, 100, epsrel=1e-8)
     return integral
 
-# Maybe change to version without safeguards
-
 def neg_integral20(theta_val, mu, Si, zetai, gi, theta_i_minus1, lamb, b0, alpha, Rf, delta, nu):
-    """Safeguarded version for the negative side of Equation20.
-       theta_val is a scalar."""
-    if abs(theta_val) < 1e-8 or abs(Si) < 1e-8:
-        return 0.0
-    limit = Rf - theta_i_minus1 * gi / theta_val
-    if np.isnan(limit) or np.isinf(limit):
-        return 0.0
-    def integrand(x):
-        expr = theta_val * (Rf - x) - theta_i_minus1 * gi
-        if expr < 0:
-            return 0.0
-        else:
-            return (-lamb * b0 * (expr**alpha)) * dwP_Ri(x, mu, Si, zetai, delta, nu)
-    try:
-        integral, _ = quad(integrand, -100, limit, epsrel=1e-8)
-        return integral if np.isfinite(integral) else 0.0
-    except Exception as e:
-        return 0.0
+    if theta_val >= 0:
+        integral, err = quad(
+            lambda x: (-lamb * b0 * (theta_val * (Rf - x) - theta_i_minus1 * gi)**alpha)
+                      * dwP_Ri(x, mu, Si, zetai, delta, nu),
+            -100, Rf - theta_i_minus1 * gi / theta_val,
+            epsrel=1e-8
+        )
+    else:  # theta_val < 0
+        integral, err = quad(
+            lambda x: (b0 * (theta_val * (x - Rf) + theta_i_minus1 * gi)**alpha)
+                      * dwP_Ri(x, mu, Si, zetai, delta, nu),
+            -100, Rf - theta_i_minus1 * gi / theta_val,
+            epsrel=1e-8
+        )
+    return integral
 
-def pos_integral20(theta_val, mu, Si, zetai, gi, theta_i_minus1, b0, Rf, alpha, delta, nu):
-    """Safeguarded version for the positive side of Equation20.
-       theta_val is a scalar."""
-    if abs(theta_val) < 1e-8 or abs(Si) < 1e-8:
-        return 0.0
-    limit = Rf - theta_i_minus1 * gi / theta_val
-    if np.isnan(limit) or np.isinf(limit):
-        return 0.0
-    def integrand(x):
-        expr = theta_val * (x - Rf) + theta_i_minus1 * gi
-        if expr < 0:
-            return 0.0
-        else:
-            return (-b0 * (expr**alpha)) * dwP_1_Ri(x, mu, Si, zetai, delta, nu)
-    try:
-        integral, _ = quad(integrand, limit, 100, epsrel=1e-8)
-        return integral if np.isfinite(integral) else 0.0
-    except Exception as e:
-        return 0.0
+def pos_integral20(theta_val, mu, Si, zetai, gi, theta_i_minus1, lamb, b0, alpha, Rf, delta, nu):
+    if theta_val >= 0:
+        integral, err = quad(
+            lambda x: (-b0 * (theta_val * (x - Rf) + theta_i_minus1 * gi)**alpha)
+                      * dwP_1_Ri(x, mu, Si, zetai, delta, nu),
+            Rf - theta_i_minus1 * gi / theta_val, 100,
+            epsrel=1e-8
+        )
+    else:  # theta_val < 0
+        integral, err = quad(
+            lambda x: (lamb * b0 * (theta_val * (Rf - x) - theta_i_minus1 * gi)**alpha)
+                      * dwP_1_Ri(x, mu, Si, zetai, delta, nu),
+            Rf - theta_i_minus1 * gi / theta_val, 100,
+            epsrel=1e-8
+        )
+    return integral
 
-def Equation35(mu, zetai, Si, gi, theta_mi, theta_i_minus1, βi, sigma_m, nu, Rf, gamma_hat, alpha, lamb, b0, delta):
+def Equation35(mu, zetai, Si, gi, theta_mi, theta_i_minus1, betai, sigma_m, nu, Rf, gamma_hat, alpha, lamb, b0, delta):
     """Equation35 to solve for mu (returned as a 1-element vector)."""
-    term1 = (mu[0] + (nu*zetai/(nu-2) - Rf)) - gamma_hat * βi * sigma_m**2
+    term1 = (mu[0] + (nu*zetai/(nu-2) - Rf)) - gamma_hat * betai * sigma_m**2
     term2 = -alpha * lamb * b0 * neg_integral(mu[0], Si, zetai, gi, theta_mi, theta_i_minus1, Rf, alpha, delta, nu)
     term3 = -alpha * b0 * pos_integral(mu[0], Si, zetai, gi, theta_mi, theta_i_minus1, Rf, alpha, delta, nu)
     return term1 + term2 + term3
 
-def Equation20(theta_vec, zetai, mu_val, nu, σi, βi, sigma_m, theta_mi, theta_i_minus1, Rf, gamma_hat, lamb, b0, Si, gi, alpha, delta, mu_param):
+def Equation20(theta_vec, zetai, mu_global, nu, σi, βi, sigma_m, theta_mi, theta_i_minus1, Rf, gamma_hat, lamb, b0, Si, gi, alpha, delta):
     """Entire objective function to optimize for theta."""
     theta = theta_vec[0]
-    term1 = theta * (mu_val + (nu*zetai/(nu-2) - Rf)) - gamma_hat/2*(theta**2*σi**2 + 2*theta*(βi*sigma_m**2 - theta_mi*σi**2))
-    term2 = neg_integral20(theta, mu_param, Si, zetai, gi, theta_i_minus1, lamb, b0, alpha, Rf, delta, nu)
-    term3 = pos_integral20(theta, mu_param, Si, zetai, gi, theta_i_minus1, b0, Rf, alpha, delta, nu)
+    term1 = theta * (mu_global + (nu*zetai/(nu-2) - Rf)) - gamma_hat/2*(theta**2*σi**2 + 2*theta*(βi*sigma_m**2 - theta_mi*σi**2))
+    term2 = neg_integral20(theta, mu, Si, zetai, gi, theta_i_minus1, lamb, b0, alpha, Rf, delta, nu)
+    term3 = pos_integral20(theta, mu, Si, zetai, gi, theta_i_minus1, b0, Rf, alpha, delta, nu)
     return -(term1 + term2 + term3)
 
 # -------------------------
 # Solve for μ̂ and θ̂ for each portfolio
 # -------------------------
 # For each portfolio index j (0-indexed in Python)
-for j in range(1): #change back to 3 when model is ready
+for j in range(2): #change back to 3 when model is ready
     sigmai_val = sigma_i[j]
     betai_val = beta_i[j]
     gi_val = g_i[j]
@@ -201,22 +181,22 @@ for j in range(1): #change back to 3 when model is ready
                                                betai_val, sigma_m, nu, Rf, gamma_hat, alpha, lamb, b0, delta)]),
                [0.5])
     mu_solution = solving.x[0]
-    mu_hat[j] = mu_solution
+    mu[j] = mu_solution
 
     # Now optimize Equation20 for theta. We treat theta as a scalar.
-    res = minimize(lambda th: Equation20([th], zetai_val, mu_hat[j], nu, sigmai_val, betai_val, sigma_m,
-                                          theta_mi, theta_i_minus1, Rf, gamma_hat, lamb, b0, Si_val, gi_val, alpha, delta, mu_solution),
+    res = minimize(lambda theta: Equation20([theta], zetai_val, mu[j], nu, sigmai_val, betai_val, sigma_m,
+                                          theta_mi, theta_i_minus1, Rf, gamma_hat, lamb, b0, Si_val, gi_val, alpha, delta),
                    x0=[theta_mi],
                    bounds=[(-theta_mi, theta_mi*2)])
-    theta_hat[j] = res.x[0]
+    theta[j] = res.x[0]
 
 # -------------------------
 # Save results to CSV
 # -------------------------
 results_df = pd.DataFrame({
     "portfolio": ["DI", "HY", "IG"],
-    "mu_hat": mu_hat,
-    "theta_hat": theta_hat
+    "mu": mu,
+    "theta": theta
 })
 results_df.to_csv(os.path.join(project_folder, "data", "results", "mu_theta_results.csv"), index=False)
 

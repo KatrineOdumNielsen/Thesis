@@ -343,72 +343,71 @@ print("Done calculating capital gain overhang (CGO).")
 print("Calculating volatility and skewness...")
 model_data = model_data.sort_values(['cusip', 'eom'])
 
-def compute_vol_skew(group, window=12, min_periods=3):
-    group = group.sort_values('eom').copy()
-    vol_list = []
-    skew_list = []
-    for i in range(len(group)):
-        # Use the last 'window' months (or fewer if at the beginning)
-        window_data = group.iloc[max(0, i - window + 1):i + 1]['ret_exc']
-        if len(window_data) < min_periods:
-            vol_list.append(np.nan)
-            skew_list.append(np.nan)
-        else:
-            # Compute sample standard deviation and skewness
-            vol_list.append(np.nanstd(window_data, ddof=1))
-            skew_list.append(skew(window_data, nan_policy='omit'))
-    group['volatility'] = vol_list
-    group['skewness'] = skew_list
-    return group
-
-model_data = model_data.groupby('cusip').apply(compute_vol_skew, window=12, min_periods=3).reset_index(drop=True)
-
-model_data.to_csv((data_folder + "/preprocessed/model_data.csv"), index=False)
-print("Updated model_data with volatility and skewness saved.")
-
-monthly_vol_skew = model_data.groupby(['eom', 'portfolio']).agg(
-    volatility = ('volatility', 'mean'),
-    skewness   = ('skewness', 'mean')
-).reset_index()
-
-
-
-# model_data['ret_exc'] = model_data['ret_exc'].fillna(0)
-# model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
-
-# def compute_annual_return(bond_df):
-#     """
-#     For a given bond (grouped by cusip), compute the annual return using a rolling
-#     12-month window. The annual return is computed as:
-#         annual_return = exp(sum(log_ret over 12 months)) - 1).
-#     If fewer than 12 months are available, return NaN.
-#     """
-#     bond_df = bond_df.sort_values('eom').reset_index(drop=True)
-#     annual_returns = []
-#     for i in range(len(bond_df)):
-#         if i + 12 <= len(bond_df):
-#             window = bond_df.loc[i:i+11, 'log_ret']
-#             annual_ret = np.exp(window.sum()) - 1
+# def compute_vol_skew(group, window=12, min_periods=3):
+#     group = group.sort_values('eom').copy()
+#     vol_list = []
+#     skew_list = []
+#     for i in range(len(group)):
+#         # Use the last 'window' months (or fewer if at the beginning)
+#         window_data = group.iloc[max(0, i - window + 1):i + 1]['ret_exc']
+#         if len(window_data) < min_periods:
+#             vol_list.append(np.nan)
+#             skew_list.append(np.nan)
 #         else:
-#             annual_ret = np.nan
-#         annual_returns.append(annual_ret)
-#     bond_df['annual_return'] = annual_returns
-#     return bond_df
+#             # Compute sample standard deviation and skewness
+#             vol_list.append(np.nanstd(window_data, ddof=1))
+#             skew_list.append(skew(window_data, nan_policy='omit'))
+#     group['volatility'] = vol_list
+#     group['skewness'] = skew_list
+#     return group
 
-# # We'll loop over each portfolio and compute the cross-sectional volatility and skewness.
-# vol_skew_list = []
-# portfolios = model_data['portfolio'].unique()
-# for port in portfolios:
-#     port_data = model_data[model_data['portfolio'] == port].copy()
-#     port_data = port_data.groupby('cusip').apply(compute_annual_return).reset_index(drop=True)
-#     vol_skew = port_data.groupby('eom')['annual_return'].agg(
-#         volatility = lambda x: np.nanstd(x),
-#         skewness   = lambda x: skew(x, nan_policy='omit')
-#     ).reset_index()
-#     vol_skew['portfolio'] = port # Add the portfolio label for clarity.
-#     vol_skew_list.append(vol_skew)
+# model_data = model_data.groupby('cusip').apply(compute_vol_skew, window=12, min_periods=3).reset_index(drop=True)
 
-# final_vol_skew = pd.concat(vol_skew_list, ignore_index=True) # Concatenate the results from all portfolios.
+# model_data.to_csv((data_folder + "/preprocessed/model_data.csv"), index=False)
+# print("Updated model_data with volatility and skewness saved.")
+
+# monthly_vol_skew = model_data.groupby(['eom', 'portfolio']).agg(
+#     volatility = ('volatility', 'mean'),
+#     skewness   = ('skewness', 'mean')
+# ).reset_index()
+
+
+model_data['ret_exc'] = model_data['ret_exc'].fillna(0)
+model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
+
+def compute_annual_return(bond_df):
+    """
+    For a given bond (grouped by cusip), compute the annual return using a rolling
+    12-month window. The annual return is computed as:
+        annual_return = exp(sum(log_ret over 12 months)) - 1).
+    If fewer than 12 months are available, return NaN.
+    """
+    bond_df = bond_df.sort_values('eom').reset_index(drop=True)
+    annual_returns = []
+    for i in range(len(bond_df)):
+        if i + 12 <= len(bond_df):
+            window = bond_df.loc[i:i+11, 'log_ret']
+            annual_ret = np.exp(window.sum()) - 1
+        else:
+            annual_ret = np.nan
+        annual_returns.append(annual_ret)
+    bond_df['annual_return'] = annual_returns
+    return bond_df
+
+# We'll loop over each portfolio and compute the cross-sectional volatility and skewness.
+vol_skew_list = []
+portfolios = model_data['portfolio'].unique()
+for port in portfolios:
+    port_data = model_data[model_data['portfolio'] == port].copy()
+    port_data = port_data.groupby('cusip').apply(compute_annual_return).reset_index(drop=True)
+    vol_skew = port_data.groupby('eom')['annual_return'].agg(
+        volatility = lambda x: np.nanstd(x),
+        skewness   = lambda x: skew(x, nan_policy='omit')
+    ).reset_index()
+    vol_skew['portfolio'] = port # Add the portfolio label for clarity.
+    vol_skew_list.append(vol_skew)
+
+final_vol_skew = pd.concat(vol_skew_list, ignore_index=True) # Concatenate the results from all portfolios.
 
 # print("Volatility and Skewness for Each Portfolio:")
 # print(final_vol_skew.head())
@@ -426,7 +425,7 @@ final_monthly_df = final_monthly_df.merge(monthly_cgo[['eom', 'portfolio', 'cap_
                                           on=['eom', 'portfolio'], how='left')
 final_monthly_df = final_monthly_df.merge(market_return_df, on='eom', how='left')
 final_monthly_df = final_monthly_df.merge(
-    monthly_vol_skew[['eom', 'portfolio', 'volatility', 'skewness']],
+    final_vol_skew[['eom', 'portfolio', 'volatility', 'skewness']],
     on=['eom', 'portfolio'],
     how='left')
 final_monthly_df.to_csv(os.path.join(data_folder, "preprocessed", "final_monthly_data.csv"), index=False)
