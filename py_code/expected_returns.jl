@@ -67,7 +67,7 @@ theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", 
 average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
 
 nu = 17 #was 7.5
-σm = 0.05 #was 0.25
+σm = 0.08 #was 0.25
 Rf = 1
 
 γ̂, b0 = (0.6, 0.6)
@@ -76,6 +76,7 @@ Rf = 1
 σ_i = average_metrics_updated.volatility
 β_i = average_metrics_updated.beta
 g_i = average_metrics_updated.cap_gain_overhang
+g_i = g_i / 100
 S_i = average_metrics_updated.Si
 zeta_i = average_metrics_updated.zeta
 
@@ -258,7 +259,7 @@ function Equation20(θᵢ,zetai,μ̂,nu,σi,βi,σm,theta_mi,theta_i_minus1,Rf,�
 end
 
 # ------ Run model and solve for μ̂ and θ̂ᵢ for each portfolio ------
-for j = 1:1#CHANGE TO 3
+for j = 1:3#CHANGE TO 3
     println("Calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     σi = σ_i[j]

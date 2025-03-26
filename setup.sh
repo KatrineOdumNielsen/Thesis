@@ -25,4 +25,4 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Now run your Python script
-# python py_code/Date_file.py
+python replica_code2.jl

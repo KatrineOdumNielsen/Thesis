@@ -10,42 +10,43 @@
 #
 #
 # ======================================================================================================================
-# Change to your project directory
-Project_folder = os.getcwd()
-# result_folder = Project_folder * "/result"
+ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
+ENV["SSL_CERT_FILE"] = ""
 
-cd(Project_folder * "/_temp")
+# Get the current working directory in Julia
+project_folder = pwd()
+cd(joinpath(project_folder))
 
-using Pkg
-# Pkg.activate(joinpath(pwd(),".."))
-Pkg.activate(joinpath(pwd(),"code"))
+using Pkg, Base.Filesystem
+#Pkg.activate(joinpath(pwd(),"code"))
 
-
-# Pkg.add("Statistics")
-# Pkg.add("Distributions")
-# Pkg.add("LinearAlgebra")
-# Pkg.add("Plots")
-# Pkg.add("Parameters")
-# Pkg.add("PrettyTables")
-# Pkg.add("StatsPlots")
-# Pkg.add("SpecialFunctions")
-# Pkg.add("Optim")
-# Pkg.add("QuadGK")
-# Pkg.add("NLsolve")
-# Pkg.add("ForwardDiff")
-# Pkg.add("CSV")
-# Pkg.add("DataFrames")
-# Pkg.add("BlackBoxOptim")
-# Pkg.add("JuMP")
-# Pkg.add("Ipopt")
-# Pkg.add("GLPK")
-# Pkg.add(url="https://github.com/JuliaMPC/NLOptControl.jl")
-# Pkg.add("GR")
-# Pkg.add("PGFPlotsX")
-# Pkg.add("PlotlyJS")
-# Pkg.add("ORCA")
-# Pkg.add("PyPlot")
-# Pkg.add("PlotThemes")
+#Pkg.add(url="https://github.com/JuliaMPC/NLOptControl.jl")
+#Pkg.add(PackageSpec(name="KNITRO", version="0.5.0"))
+#Pkg.pin("KNITRO")  # This pins the currently resolved version
+#Pkg.add("Statistics")
+#Pkg.add("Distributions")
+#Pkg.add("LinearAlgebra")
+#Pkg.add("Parameters")
+#Pkg.add("PrettyTables")
+#Pkg.add("StatsPlots")
+#Pkg.add("SpecialFunctions")
+#Pkg.add("Optim")
+#Pkg.add("QuadGK")
+#Pkg.add("NLsolve")
+#Pkg.add("ForwardDiff")
+#Pkg.add("CSV")
+#Pkg.add("DataFrames")
+#Pkg.add("BlackBoxOptim")
+#Pkg.add("JuMP")
+#Pkg.add("Ipopt")
+#Pkg.add("GLPK")
+#Pkg.add("GR")
+#Pkg.add("PGFPlotsX")
+#Pkg.add("PlotlyJS")
+#Pkg.add("ORCA")
+#Pkg.add("PyPlot")
+#Pkg.add("PlotThemes")
+#Pkg.add("DocStringExtensions")
 
 using LinearAlgebra, Random, Distributions, Plots, Parameters, PrettyTables, Printf
 using Optim
@@ -66,12 +67,10 @@ Plots.showtheme(:vibrant)
 theme(:vibrant)
 
 #%% Import parameters generated from python part 3a
-momr_avg_theta_all = DataFrame(CSV.File(Project_folder * "/data/momr_avg_theta_all.csv"))
-momr_beta = DataFrame(CSV.File(Project_folder * "/data/momr_avg_beta_all.csv"))
-momr_gi = DataFrame(CSV.File(Project_folder * "/data/momr_avg_g_i_all.csv"))
-momr_std_skew = DataFrame(CSV.File(Project_folder * "/data/momr_avg_std_skew_Si_xi_all.csv"))
-
-
+momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
+momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
+momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
+momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
 
 #%% Set parameters
 nu = 7.5
@@ -208,99 +207,9 @@ for j = 1:10
 
     result2 = optimize(θᵢ  -> Equation20(θᵢ,μ̂[j]), -theta_mi, theta_mi*2)
     θ̂ᵢ[j] = Optim.minimizer(result2)[1]
-
-
 end
+println("Values of μ̂ (mu_hat):")
+println(μ̂)
 
-
-#%% Draw Figure 3
-function Equation20(θᵢ,μ̂)
-
-    term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term1 + term2 + term3)
-end
-
-θᵢ_rand = LinRange(0.000001,0.002,100)
-u_rand = Equation20.(θᵢ_rand,μ̂[j])
-
-θᵢ_rand_neg = LinRange(-0.001,-0.000001,100)
-u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
-
-θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-u_rand_all = [u_rand_neg; u_rand]
-
-
-#   Plot graphs
-# gr()
-# Plots.GRBackend()
-pyplot()
-Plots.PyPlotBackend()
-plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
-xlabel!("θ₁", xguidefontsize=10)
-ylabel!("utility", yguidefontsize=10)
-title!("Objective function of Equation 20", titlefontsize=10)
-savefig("Figure3.png")
-
-
-#%% Draw Figure 3 for decile 10
-function Equation20(θᵢ,μ̂)
-
-    term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term1 + term2 + term3)
-end
-
-function Equation20_MV(θᵢ,μ̂)
-
-    term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    # term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    # term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term1)
-end
-
-function Equation20_PT(θᵢ,μ̂)
-
-    # term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term2 + term3)
-end
-
-θᵢ_rand = LinRange(0.000001,0.25,100)
-u_rand = Equation20.(θᵢ_rand,0.5815)
-MV_rand = Equation20_MV.(θᵢ_rand,0.5815)
-PT_rand = Equation20_PT.(θᵢ_rand,0.5815)
-
-θᵢ_rand_neg = LinRange(-0.01,-0.00001,100)
-u_rand_neg = Equation20.(θᵢ_rand_neg,0.5815)
-MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,0.5815)
-PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,0.5815)
-
-
-θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-u_rand_all = [u_rand_neg; u_rand]
-MV_rand_all = [MV_rand_neg; MV_rand]
-PT_rand_all = [PT_rand_neg; PT_rand]
-
-
-#   Plot graphs
-# gr()
-# Plots.GRBackend()
-pyplot()
-Plots.PyPlotBackend()
-plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
-plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-xlabel!("θ₁₀", xguidefontsize=10)
-ylabel!("utility", yguidefontsize=10)
-title!("Objective function for Decile 10", titlefontsize=10)
-savefig("Figure4.png")
-
-print("Done")
+println("Values of θ̂ᵢ (theta_hat):")
+println(θ̂ᵢ)
