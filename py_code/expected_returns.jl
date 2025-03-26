@@ -66,8 +66,8 @@ theme(:vibrant)
 theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
 average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
 
-nu = 7.5
-σm = 0.25
+nu = 17 #was 7.5
+σm = 0.05 #was 0.25
 Rf = 1
 
 γ̂, b0 = (0.6, 0.6)
@@ -79,8 +79,8 @@ g_i = average_metrics_updated.cap_gain_overhang
 S_i = average_metrics_updated.Si
 zeta_i = average_metrics_updated.zeta
 
-Ri = 0.01
-mu = 0.005
+Ri = 0.001 #was 0.01
+mu = 0.0005 #was 0.005
 
 # ===================================================================    
 #                     b. Calculate μ̂ and θ̂        
