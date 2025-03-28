@@ -223,9 +223,9 @@ for j = 1:3
     # Define neg_integral in Equation 20
     function neg_integral20(θᵢ, mu, Si, xi, g_i,theta_i_minus1,lamb, b0)
         if θᵢ >= 0
-            integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, xi), -100, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-10)
+            integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, xi), -100, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-8)
         elseif θᵢ < 0
-            integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, xi), -100, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-10)
+            integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, xi), -100, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-8)
         end
 
         return integral
@@ -234,9 +234,9 @@ for j = 1:3
     # Define pos_integral in Equation 20
     function pos_integral20(θᵢ, mu, Si, xi, g_i,theta_i_minus1,lamb, b0)
         if θᵢ >= 0
-            integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, xi), Rf-theta_i_minus1*g_i/θᵢ, 100, rtol=1e-10)
+            integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, xi), Rf-theta_i_minus1*g_i/θᵢ, 100, rtol=1e-8)
         elseif θᵢ < 0
-            integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, xi), Rf-theta_i_minus1*g_i/θᵢ, 100, rtol=1e-10)
+            integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, xi), Rf-theta_i_minus1*g_i/θᵢ, 100, rtol=1e-8)
         end
 
         return integral
@@ -281,11 +281,11 @@ for j = 1:3
     end
     
     #θᵢ_rand = LinRange(0.00001,0.002,50)
-    θᵢ_rand = LinRange(0.0001,0.009,50)
+    θᵢ_rand = LinRange(0.0001,0.015,50)
     u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
     #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-    θᵢ_rand_neg = LinRange(-0.009,-0.0001,50)
+    θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
     u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
     θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
