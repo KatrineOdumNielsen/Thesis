@@ -72,31 +72,56 @@ momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg
 momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
 momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
 
-#%% Set parameters
-nu = 7.5
-σm = 0.25
-Rf = 1
+#%% Set parameters (their parameters)
+#nu = 7.5
+#σm = 0.25
+#Rf = 1
 
-γ̂, b0 = (0.6, 0.6)
-α, δ, lamb = (0.7, 0.65, 1.5)
+# γ̂, b0 = (0.6, 0.6)
+# α, δ, lamb = (0.7, 0.65, 1.5)
 
-σᵢ_all = momr_std_skew.avg_std
-βᵢ_all = momr_beta.avg_beta
-g_i_all = momr_gi.avg_gi
-Si_all = momr_std_skew.Si
-xi_all = momr_std_skew.xi
-theta_mi_all = momr_avg_theta_all.avg_theta_mi ./100
-theta_i_minus1_all = momr_avg_theta_all.avg_theta_mi ./100
+# σᵢ_all = momr_std_skew.avg_std
+# βᵢ_all = momr_beta.avg_beta
+# g_i_all = momr_gi.avg_gi
+# Si_all = momr_std_skew.Si
+# xi_all = momr_std_skew.xi
+# theta_mi_all = momr_avg_theta_all.avg_theta_mi ./100
+# theta_i_minus1_all = momr_avg_theta_all.avg_theta_mi ./100
 
+#Ri = 0.01
+#mu = 0.005
 
-Ri = 0.01
-mu = 0.005
+## =========== Our parameters ============= ##
+nu = 8 #changed
+σm = 0.08 #changed
+Rf = 1 #unchanged
+
+γ̂, b0 = (0.6, 0.6) #unchanged
+α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
+
+#Ri = 0.01 #changed
+#mu = 0.005 #changed
+
+theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
+average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
+
+σᵢ_all = average_metrics_updated.volatility
+βᵢ_all = average_metrics_updated.beta
+g_i_all = average_metrics_updated.cap_gain_overhang ./ 100
+Si_all = average_metrics_updated.Si
+xi_all = average_metrics_updated.zeta #this is our zeta, changed name later
+theta_mi_all = theta_all.theta_mi
+theta_i_minus1_all = theta_all.theta_i_minus1
+
+## 
 
 #%% Calculate μ̂ and θ̂ᵢ
-μ̂ = zeros(10,1)
-θ̂ᵢ = zeros(10,1)
+# μ̂ = zeros(10,1)
+# θ̂ᵢ = zeros(10,1)
+μ̂ = zeros(3,1)
+θ̂ᵢ = zeros(3,1)
 
-for j = 10:10
+for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for momentum decile ",j)
 
     σᵢ = σᵢ_all[j]
@@ -183,9 +208,9 @@ for j = 10:10
 
     # Solve Equation 35 and get μ̂
     function Equation35(mu)
-        term1 = (mu[1] + (nu * xi / (nu-2) - Rf)) - γ̂ * βᵢ * σm ^ 2
-        term2 = -α * lamb * b0 * neg_integral(mu[1], Si, xi, g_i,theta_mi,theta_i_minus1)
-        term3 = - α * b0 * pos_integral(mu[1], Si, xi, g_i,theta_mi,theta_i_minus1)
+        term1 = (mu[j] + (nu * xi / (nu-2) - Rf)) - γ̂ * βᵢ * σm ^ 2
+        term2 = -α * lamb * b0 * neg_integral(mu[j], Si, xi, g_i,theta_mi,theta_i_minus1)
+        term3 = - α * b0 * pos_integral(mu[j], Si, xi, g_i,theta_mi,theta_i_minus1)
 
         return term1 + term2 + term3
     end
@@ -194,9 +219,9 @@ for j = 10:10
     # Equation 20
     function Equation20(θᵢ,μ̂)
 
-        term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-        term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-        term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term1 = θᵢ[j] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[j]^2 * σᵢ^2 + 2*θᵢ[j]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
 
         return -(term1 + term2 + term3)
     end
@@ -207,49 +232,98 @@ for j = 10:10
 
     result2 = optimize(θᵢ  -> Equation20(θᵢ,μ̂[j]), -theta_mi, theta_mi*2)
     θ̂ᵢ[j] = Optim.minimizer(result2)[1]
+    
+    #%% Draw Figure 3 for portfolio j
+    function Equation20(θᵢ,μ̂)
 
-    println("$j theta is ", θ̂ᵢ[j])
-    println("$j mu is ", μ̂[j])
-    if abs(θ̂ᵢ[j] - theta_mi) < 0.0000001
-        println("$j is a homogeneous equilibrium")
-    elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.0000001
-        println("$j is a heterogeneous equilibrium")
+        term1 = θᵢ[j] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[j]^2 * σᵢ^2 + 2*θᵢ[j]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
 
-        μ_pot = LinRange(μ̂[j]-0.1,μ̂[j]+0.1,100)
-        using DataFrames, Optim
-
-        # Create a DataFrame to store the results
-        results_df = DataFrame(μ_pot = Float64[], opt_theta_low = Float64[], opt_theta_high = Float64[], utility_low = Float64[], utility_high = Float64[], utility_diff = Float64[])
-        
-        # Iterate over all μ_pot values
-        for (i, μ_pot_i) in enumerate(μ_pot)
-            println("Processing iteration $i out of $(length(μ_pot)) with μ_pot_i = $μ_pot_i")
-        
-            # Optimize for the range [0, theta_mi]
-            result_low = optimize(θᵢ -> Equation20(θᵢ, μ_pot_i), 0, theta_mi - 0.0001)
-            opt_theta_low = Optim.minimizer(result_low)[1]  # Extract the optimal theta for the low range
-        
-            # Optimize for the range [theta_mi, 1]
-            result_high = optimize(θᵢ -> Equation20(θᵢ, μ_pot_i), theta_mi + 0.0001, 1.0)
-            opt_theta_high = Optim.minimizer(result_high)[1]  # Extract the optimal theta for the high range
-        
-            # Calculate utilities
-            utility_low = Equation20(opt_theta_low, μ_pot_i)  # Utility for opt_theta_low
-            utility_high = Equation20(opt_theta_high, μ_pot_i)  # Utility for opt_theta_high
-        
-            # Calculate the difference between the two utilities
-            utility_diff = abs(utility_low - utility_high)
-        
-            # Add the results to the DataFrame
-            push!(results_df, (μ_pot_i, opt_theta_low, opt_theta_high, utility_low, utility_high, utility_diff))
-        end
-        println(results_df)
-        # Find the index of the row with the lowest u_diff
-        index_of_min_u_diff = argmin(results_df.utility_diff)
-
-        # Print the row with the lowest u_diff
-        println("Row with the lowest u_diff:")
-        println(results_df[index_of_min_u_diff, :])
+        return -(term1 + term2 + term3)
     end
-end
+    
+    #θᵢ_rand = LinRange(0.00001,0.002,50)
+    θᵢ_rand = LinRange(0.00001,0.002,50)
+    u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
+    #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
+    θᵢ_rand_neg = LinRange(-0.001,-0.0001,50)
+    u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
+
+    θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+    u_rand_all = [u_rand_neg; u_rand]
+
+    #   Plot graphs
+    # gr()
+    # Plots.GRBackend()
+    pyplot()
+    Plots.PyPlotBackend()
+    plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
+    xlabel!("θ₁", xguidefontsize=10)
+    ylabel!("utility", yguidefontsize=10)
+    title!("Objective function of Equation 20", titlefontsize=10)
+    savefig("Figure3_portfolio$(j).png")
+
+    println("done with fig 3, starting on fig 4")
+
+    #%% Draw Figure 4 for portfolio j
+    function Equation20(θᵢ,μ̂)
+
+        term1 = θᵢ[j] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[j]^2 * σᵢ^2 + 2*θᵢ[j]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term1 + term2 + term3)
+    end
+
+    function Equation20_MV(θᵢ,μ̂)
+
+        term1 = θᵢ[j] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[j]^2 * σᵢ^2 + 2*θᵢ[j]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        # term2 =  neg_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        # term3 =  pos_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term1)
+    end
+
+    function Equation20_PT(θᵢ,μ̂)
+
+        # term1 = θᵢ[j] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[j]^2 * σᵢ^2 + 2*θᵢ[j]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[j], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term2 + term3)
+    end
+    hetro_mu = 0.5405 #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
+
+    θᵢ_rand = LinRange(0.00001,0.25,100)
+    u_rand = Equation20.(θᵢ_rand,hetro_mu)
+    MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
+    PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
+
+    θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+    u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
+    MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
+    PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
+
+    θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+    u_rand_all = [u_rand_neg; u_rand]
+    MV_rand_all = [MV_rand_neg; MV_rand]
+    PT_rand_all = [PT_rand_neg; PT_rand]
+
+    #   Plot graphs
+    # gr()
+    # Plots.GRBackend()
+    pyplot()
+    Plots.PyPlotBackend()
+    plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
+    plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+    plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+    xlabel!("θ₁", xguidefontsize=10)
+    ylabel!("utility", yguidefontsize=10)
+    title!("Objective function for Decile 1", titlefontsize=10)
+    savefig("Figure4_kat.png")
+
+end
+println(μ̂,)
+println(θ̂ᵢ)

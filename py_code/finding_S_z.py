@@ -44,10 +44,14 @@ print("\nAverage proportions across all months:")
 print(avg_portfolio_props)
 
 #Rounds the average proportions to even numbers
-N = 1000
-pr_DI = 30
-pr_HY = 190
-pr_IG = 780
+N = 100
+pr_DI = 3
+pr_HY = 19
+pr_IG = 78
+# N = 1000
+# pr_DI = 30
+# pr_HY = 190
+# pr_IG = 780
 # N = 5000
 # pr_DI = 150
 # pr_HY = 950
