@@ -99,8 +99,8 @@ Rf = 1 #unchanged
 γ̂, b0 = (0.6, 0.6) #unchanged
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
-#Ri = 0.01 #changed
-#mu = 0.005 #changed
+Ri = 0.01 #changed
+mu = 0.005 #changed
 
 theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
 average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
@@ -109,7 +109,7 @@ average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "p
 βᵢ_all = average_metrics_updated.beta
 g_i_all = average_metrics_updated.cap_gain_overhang ./ 100
 Si_all = average_metrics_updated.Si
-xi_all = average_metrics_updated.zeta #this is our zeta, changed name later
+xi_all = average_metrics_updated.zeta #this is our zeta, change name later
 theta_mi_all = theta_all.theta_mi
 theta_i_minus1_all = theta_all.theta_i_minus1
 
@@ -196,26 +196,10 @@ for j = 1:3
         return integral
     end
 
-    # function pos_integral(mu, Si, xi, g_i, theta_mi, theta_i_minus1)
-    #     # Define integration limits:
-    #     a = Rf - theta_i_minus1 * g_i / theta_mi  # e.g. a = 0.147
-    #     b = 100.0
-    #     δ_split = 1e-8   # a small number to exclude x=1
-    
-    #     # Define the integrand function.
-    #     integrand(x) = ((theta_mi * (x - Rf) + theta_i_minus1 * g_i)^(α - 1)) *
-    #                    (x - Rf) *
-    #                    dwP_1_Ri(x, mu, Si, xi)
-    
-    #     # Split the integration domain to avoid x = 1.
-    #     int1, err1 = quadgk(integrand, a, 1.0 - δ_split, rtol=1e-10)
-    #     int2, err2 = quadgk(integrand, 1.0 + δ_split, b, rtol=1e-10)
-    #     return int1 + int2
-    # end
-
     # Define pos_integral
     function pos_integral(mu, Si, xi, g_i, theta_mi,theta_i_minus1)
-        integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * g_i) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, xi), Rf-theta_i_minus1*g_i/theta_mi, 100, rtol=1e-8)
+        integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * g_i) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, xi), 
+        Rf-theta_i_minus1*g_i/theta_mi, 100, rtol=1e-8)
 
         return integral
     end
@@ -281,7 +265,7 @@ for j = 1:3
     end
     
     #θᵢ_rand = LinRange(0.00001,0.002,50)
-    θᵢ_rand = LinRange(0.0001,0.015,50)
+    θᵢ_rand = LinRange(0.0001,0.25,1000)
     u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
     #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
