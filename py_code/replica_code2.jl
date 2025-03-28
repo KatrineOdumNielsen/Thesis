@@ -211,7 +211,7 @@ for j = 1:10
 
 end
 println(μ̂, θ̂ᵢ)
-"
+"""
 #%% Draw Figure 3
 function Equation20(θᵢ,μ̂)
 
@@ -301,4 +301,4 @@ xlabel!("θ₁₀", xguidefontsize=10)
 ylabel!("utility", yguidefontsize=10)
 title!("Objective function for Decile 10", titlefontsize=10)
 savefig("Figure4.png")
-"
+"""
