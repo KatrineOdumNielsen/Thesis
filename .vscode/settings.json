@@ -1,3 +1,4 @@
 {
-    "jupyter.notebookFileRoot": "${workspaceFolder}"
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "julia.environmentPath": "c:\\Users\\jjr\\OneDrive\\Advanced Economics and Finance\\Python\\Thesis"
 }

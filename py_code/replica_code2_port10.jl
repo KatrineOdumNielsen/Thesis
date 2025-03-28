@@ -60,7 +60,7 @@ using ForwardDiff
 using Optim: converged, maximum, maximizer, minimizer, iterations #some extra functions
 using CSV
 using DataFrames
-# using BlackBoxOptim
+using BlackBoxOptim
 using JuMP, Ipopt
 using GLPK
 Plots.showtheme(:vibrant)
@@ -96,7 +96,7 @@ mu = 0.005
 μ̂ = zeros(10,1)
 θ̂ᵢ = zeros(10,1)
 
-for j = 1:10
+for j = 10:10
     println("I am calculating μ̂ and θ̂ᵢ for momentum decile ",j)
 
     σᵢ = σᵢ_all[j]
@@ -201,104 +201,102 @@ for j = 1:10
         return -(term1 + term2 + term3)
     end
 
-    results = nlsolve(Equation35, [0.5])
+    results = nlsolve(Equation35, [0.1])
     μ̂[j] = results.zero[1]
     # Equation35(μ̂)
 
     result2 = optimize(θᵢ  -> Equation20(θᵢ,μ̂[j]), -theta_mi, theta_mi*2)
     θ̂ᵢ[j] = Optim.minimizer(result2)[1]
+    
+    #%% Draw Figure 3
+    function Equation20(θᵢ,μ̂)
 
+        term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term1 + term2 + term3)
+    end
+    
+    θᵢ_rand = LinRange(0.00001,0.002,50)
+    u_rand = Equation20.(θᵢ_rand,μ̂[j])
+
+    θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
+    u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
+
+    θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+    u_rand_all = [u_rand_neg; u_rand]
+
+    #   Plot graphs
+    # gr()
+    # Plots.GRBackend()
+    pyplot()
+    Plots.PyPlotBackend()
+    plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
+    xlabel!("θ₁", xguidefontsize=10)
+    ylabel!("utility", yguidefontsize=10)
+    title!("Objective function of Equation 20", titlefontsize=10)
+    savefig("Figure3.png")
+
+    #%% Draw Figure 3 for decile 10
+    function Equation20(θᵢ,μ̂)
+
+        term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term1 + term2 + term3)
+    end
+
+    function Equation20_MV(θᵢ,μ̂)
+
+        term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        # term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        # term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term1)
+    end
+
+    function Equation20_PT(θᵢ,μ̂)
+
+        # term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
+
+        return -(term2 + term3)
+    end
+    println("done with something, starting on fig 4")
+    hetro_mu = 0.5405 #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
+
+    θᵢ_rand = LinRange(0.00001,0.25,100)
+    u_rand = Equation20.(θᵢ_rand,hetro_mu)
+    MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
+    PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
+
+    θᵢ_rand_neg = LinRange(-0.01,-0.00001,50)
+    u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
+    MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
+    PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
+
+    θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+    u_rand_all = [u_rand_neg; u_rand]
+    MV_rand_all = [MV_rand_neg; MV_rand]
+    PT_rand_all = [PT_rand_neg; PT_rand]
+
+
+    #   Plot graphs
+    # gr()
+    # Plots.GRBackend()
+    pyplot()
+    Plots.PyPlotBackend()
+    plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
+    plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+    plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+    xlabel!("θ₁₀", xguidefontsize=10)
+    ylabel!("utility", yguidefontsize=10)
+    title!("Objective function for Decile 10", titlefontsize=10)
+    savefig("Figure4.png")
 
 end
-println(μ̂, θ̂ᵢ)
-"
-#%% Draw Figure 3
-function Equation20(θᵢ,μ̂)
-
-    term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term1 + term2 + term3)
-end
-
-θᵢ_rand = LinRange(0.000001,0.002,100)
-u_rand = Equation20.(θᵢ_rand,μ̂[j])
-
-θᵢ_rand_neg = LinRange(-0.001,-0.000001,100)
-u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
-
-θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-u_rand_all = [u_rand_neg; u_rand]
-
-
-#   Plot graphs
-# gr()
-# Plots.GRBackend()
-pyplot()
-Plots.PyPlotBackend()
-plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
-xlabel!("θ₁", xguidefontsize=10)
-ylabel!("utility", yguidefontsize=10)
-title!("Objective function of Equation 20", titlefontsize=10)
-savefig("Figure3.png")
-
-
-#%% Draw Figure 3 for decile 10
-function Equation20(θᵢ,μ̂)
-
-    term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term1 + term2 + term3)
-end
-
-function Equation20_MV(θᵢ,μ̂)
-
-    term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    # term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    # term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term1)
-end
-
-function Equation20_PT(θᵢ,μ̂)
-
-    # term1 = θᵢ[1] * (μ̂ + (nu * xi)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    term2 =  neg_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-    term3 =  pos_integral20(θᵢ[1], μ̂, Si, xi, g_i,theta_i_minus1,lamb, b0)
-
-    return -(term2 + term3)
-end
-
-θᵢ_rand = LinRange(0.000001,0.25,100)
-u_rand = Equation20.(θᵢ_rand,0.5815)
-MV_rand = Equation20_MV.(θᵢ_rand,0.5815)
-PT_rand = Equation20_PT.(θᵢ_rand,0.5815)
-
-θᵢ_rand_neg = LinRange(-0.01,-0.00001,100)
-u_rand_neg = Equation20.(θᵢ_rand_neg,0.5815)
-MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,0.5815)
-PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,0.5815)
-
-
-θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-u_rand_all = [u_rand_neg; u_rand]
-MV_rand_all = [MV_rand_neg; MV_rand]
-PT_rand_all = [PT_rand_neg; PT_rand]
-
-
-#   Plot graphs
-# gr()
-# Plots.GRBackend()
-pyplot()
-Plots.PyPlotBackend()
-plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
-plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-xlabel!("θ₁₀", xguidefontsize=10)
-ylabel!("utility", yguidefontsize=10)
-title!("Objective function for Decile 10", titlefontsize=10)
-savefig("Figure4.png")
-"
+println(μ̂,)
+println(θ̂ᵢ)
