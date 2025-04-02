@@ -92,7 +92,7 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 #mu = 0.005
 
 ## =========== Our parameters ============= ##
-nu = 10 #changed
+nu = 17 #changed
 σm = 0.08 #changed
 Rf = 1 #unchanged
 
@@ -121,14 +121,14 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 μ̂ = zeros(3,1)
 θ̂ᵢ = zeros(3,1)
 
-for j = 3:3
+for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     σᵢ = σᵢ_all[j]
     βᵢ = βᵢ_all[j]
     g_i = g_i_all[j]
-    Si = 0.225 #Si_all[j]
-    zetai = 0.5 #zetai_all[j]
+    Si = Si_all[j]
+    zetai = zetai_all[j]
     theta_mi = theta_mi_all[j]
     theta_i_minus1 = theta_i_minus1_all[j]
 
@@ -144,7 +144,7 @@ for j = 3:3
 
     function p_Ri(Ri, mu, Si, zetai)
         threshold = 0.1
-    
+
         if abs(zetai) < threshold
             # Formula for the case ξ = 0
             # p(Ri) = Γ((ν+1)/2) / [ Γ(ν/2)* √(π·ν·Si ) ] * [1 + (Ri-μ)² / (ν·Si)]^(-(ν+1)/2)
@@ -164,7 +164,7 @@ for j = 3:3
 
     # Define P_Ri
     function P_Ri(x, mu, Si, zetai)
-        integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-8)
+        integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-11)
         return integral
     end
 
@@ -172,6 +172,7 @@ for j = 3:3
     # Define dwP_Ri
     function dwP_Ri(x, mu, Si, zetai)
         P = P_Ri(x, mu, Si, zetai)
+        P = min(P,1)
         # dwP_Ri = ((δ * P**(δ-1) * (P**δ + (1-P)**δ))
         #           - P**δ * (P**(δ-1) - (1-P)**(δ-1))) / \
         #          ((P**δ + (1-P)**δ)**(1+1/δ)) * p_Ri(Ri, mu, Si, zetai)
@@ -179,28 +180,62 @@ for j = 3:3
         return ((δ * P^(δ-1) * (P^δ + (1-P)^δ)) - P^δ * (P^(δ-1) - (1-P)^(δ-1))) /((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(x, mu, Si, zetai)
     end
 
-    # Define dwP_1_Ri
-    function dwP_1_Ri(Ri, mu, Si, zetai)
-        P = P_Ri(Ri, mu, Si, zetai)
-        result = -((δ * (1-P)^(δ-1) * (P^δ + (1-P)^δ)) - (1-P)^δ * ((1-P)^(δ-1) - P^(δ-1))) / ((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(Ri, mu, Si, zetai)
+    # # Define dwP_1_Ri
+    # function dwP_1_Ri(Ri, mu, Si, xi)
+    #     P = P_Ri(Ri, mu, Si, xi)
+    #     result = -((δ * (1-P)^(δ-1) * (P^δ + (1-P)^δ)) - (1-P)^δ * ((1-P)^(δ-1) - P^(δ-1))) / ((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(Ri, mu, Si, xi)
 
-        return result
+    #     return result
+    # end
+
+
+    function dwP_1_Ri(Ri, mu, Si, zetai)
+        # Compute P using P_Ri
+        P = P_Ri(Ri, mu, Si, zetai)
+        P = min(P,1) # capping at one due to round off errors, whereby P = 1.000000001 is set to P = 1
+        
+        if P == 1
+            return result = 0 #so we don't get NaN
+        else
+            numerator = -((δ * (1 - P)^(δ - 1) * (P^δ + (1 - P)^δ)) - (1 - P)^δ * ((1 - P)^(δ - 1) - P^(δ - 1)))
+            denominator = (P^δ + (1 - P)^δ)^(1 + 1/δ)
+            
+            # Compute p_Ri for the given inputs
+            p_val = p_Ri(Ri, mu, Si, zetai)
+            
+            result = numerator / denominator * p_val
+            return result 
+        end
     end
 
-
     # Define neg_integral
-    function neg_integral(mu, Si, zetai, g_i, theta_mi,theta_i_minus1)
-        integral, err = quadgk(x -> ((theta_mi * (Rf-x) - theta_i_minus1 * g_i) ^(α-1))* (Rf-x) * dwP_Ri(x, mu, Si, zetai), 
-        -100, Rf-theta_i_minus1*g_i/theta_mi, rtol=1e-10)
+    # function neg_integral(mu, Si, zetai, g_i, theta_mi,theta_i_minus1)
+    #     integral, err = quadgk(x -> ((theta_mi * (Rf-x) - theta_i_minus1 * g_i) ^(α-1))* (Rf-x) * dwP_Ri(x, mu, Si, zetai), 
+    #     -100, Rf-theta_i_minus1*g_i/theta_mi, rtol=1e-10)
 
+    #     return integral
+    # end
+
+    function neg_integral(mu, Si, zetai, g_i, theta_mi, theta_i_minus1)
+        lower_bound = -100
+        upper_bound = Rf - theta_i_minus1 * g_i / theta_mi
+        #println("neg_integral: Integrating from $lower_bound to $upper_bound")
+        integral, err = quadgk(x -> ((theta_mi * (Rf - x) - theta_i_minus1 * g_i)^(α - 1)) *
+                                 (Rf - x) * dwP_Ri(x, mu, Si, zetai),
+                                 lower_bound, upper_bound, rtol=1e-10)
+        #println("neg_integral: Result = $integral, error estimate = $err")
         return integral
     end
 
     # Define pos_integral
     function pos_integral(mu, Si, zetai, g_i, theta_mi,theta_i_minus1)
+        lower_bound = Rf - theta_i_minus1 * g_i / theta_mi
+        upper_bound = 100
+        #println("pos_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * g_i) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai), 
-        Rf-theta_i_minus1*g_i/theta_mi, 100, rtol=1e-8)
-
+        
+        lower_bound, upper_bound, rtol=1e-8)
+        #println("pos_integral: Result = $integral, error estimate = $err")
         return integral
     end
 
@@ -232,7 +267,7 @@ for j = 3:3
         term1 = (mu[1] + (nu * zetai / (nu-2) - Rf)) - γ̂ * βᵢ * σm ^ 2
         term2 = -α * lamb * b0 * neg_integral(mu[1], Si, zetai, g_i,theta_mi,theta_i_minus1)
         term3 = - α * b0 * pos_integral(mu[1], Si, zetai, g_i,theta_mi,theta_i_minus1)
-
+        println("Equation35: term1 = $term1, term2 = $term2, term3 = $term3")
         return term1 + term2 + term3
     end
 
