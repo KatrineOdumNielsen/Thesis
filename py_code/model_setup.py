@@ -65,19 +65,9 @@ print("Done setting up portfolios")
 print("Calculating monthly portfolio weighted returns...")   
 # Function to calculate weighted return for each bond
 def calculate_monthly_weighted_return(month_data):
-    """Compute the monthly weighted return by portfolio for a given month."""
-    monthly_total_portfolio_value_past = month_data.groupby('portfolio')['market_value_past'].sum()
-    month_data['portfolio_weight'] = month_data['market_value_past'] / monthly_total_portfolio_value_past
-    month_data['weighted_return'] = month_data['portfolio_weight'] * month_data['ret_exc']
-    return month_data
-
-
-def calculate_monthly_weighted_return(month_data):
     """
-    Given a DataFrame for a single month with columns:
-    ['portfolio', 'market_value_past', 'ret_exc'],
-    compute each bond's portfolio weight and weighted return,
-    then sum over each portfolio to get final monthly returns.
+    Given a DataFrame for a single month compute each bond's portfolio weight 
+    and weighted return, then sum over each portfolio to get final monthly returns.
     """
     # 1) For each row, get the sum of 'market_value_past' in that row's portfolio
     sum_portfolio_mv_past = month_data.groupby('portfolio')['market_value_past'].transform('sum')
@@ -372,7 +362,7 @@ model_data = model_data.sort_values(['cusip', 'eom'])
 # ).reset_index()
 
 
-model_data['ret_exc'] = model_data['ret_exc'].fillna(0)
+model_data['ret_exc'] = model_data['ret_exc']
 model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
 
 def compute_annual_return(bond_df):
@@ -404,13 +394,12 @@ for port in portfolios:
         volatility = lambda x: np.nanstd(x),
         skewness   = lambda x: skew(x, nan_policy='omit')
     ).reset_index()
-    vol_skew['portfolio'] = port # Add the portfolio label for clarity.
+    vol_skew['portfolio'] = port
     vol_skew_list.append(vol_skew)
 
 final_vol_skew = pd.concat(vol_skew_list, ignore_index=True) # Concatenate the results from all portfolios.
 
 # print("Volatility and Skewness for Each Portfolio:")
-# print(final_vol_skew.head())
 
 print("Done calculating volatility and skewness.")
 

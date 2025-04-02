@@ -27,10 +27,9 @@ average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics.csv")
 # ===================================================================    
 #                     a. Set up known parameters        
 # ===================================================================
-nu = 8
+nu = 17
 Rf = 1
-gamma_hat, b0 = (0.6, 0.6)
-alpha, delta, lamb = (0.7, 0.65, 1.5)
+
 
 # To find theta, we need to know the average number of bonds in our datasat as well as the average proportions of each portfolio of bonds.
 monthly_total = model_data_cgo.groupby('eom').size().reset_index(name='total_bonds') #Counts the number of bonds in each month
@@ -44,14 +43,14 @@ print("\nAverage proportions across all months:")
 print(avg_portfolio_props)
 
 #Rounds the average proportions to even numbers
-# N = 100
-# pr_DI = 3
-# pr_HY = 19
-# pr_IG = 78
-N = 1000
-pr_DI = 30
-pr_HY = 190
-pr_IG = 780
+N = 100
+pr_DI = 3
+pr_HY = 19
+pr_IG = 78
+# N = 1000
+# pr_DI = 30
+# pr_HY = 190
+# pr_IG = 780
 # N = 5000
 # pr_DI = 150
 # pr_HY = 950

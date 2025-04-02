@@ -70,7 +70,7 @@ theme(:vibrant)
 momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
 momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
 momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
-momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_zetai_all.csv")))
+momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
 
 #%% Set parameters (their parameters)
 #nu = 7.5
@@ -92,7 +92,7 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 #mu = 0.005
 
 ## =========== Our parameters ============= ##
-nu = 8 #changed
+nu = 10 #changed
 σm = 0.08 #changed
 Rf = 1 #unchanged
 
@@ -121,14 +121,14 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 μ̂ = zeros(3,1)
 θ̂ᵢ = zeros(3,1)
 
-for j = 1:1
+for j = 3:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     σᵢ = σᵢ_all[j]
     βᵢ = βᵢ_all[j]
     g_i = g_i_all[j]
-    Si = Si_all[j]
-    zetai = zetai_all[j]
+    Si = 0.225 #Si_all[j]
+    zetai = 0.5 #zetai_all[j]
     theta_mi = theta_mi_all[j]
     theta_i_minus1 = theta_i_minus1_all[j]
 
