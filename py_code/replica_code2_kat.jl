@@ -121,7 +121,7 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 μ̂ = zeros(3,1)
 θ̂ᵢ = zeros(3,1)
 
-for j = 1:3
+for j = 2:2
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     σᵢ = σᵢ_all[j]
@@ -132,68 +132,118 @@ for j = 1:3
     theta_mi = theta_mi_all[j]
     theta_i_minus1 = theta_i_minus1_all[j]
 
-    # Define function p_Ri
     # function p_Ri(Ri, mu, Si, zetai)
-    #     N = 1
-    #     Kl = besselk((nu + N) / 2, sqrt((nu + ((Ri - mu) ^ 2)/Si) * (zetai^2) /Si))
+    #     threshold = 0.01
 
-    #     result = (2^(1-(nu+N)/2)) / ( gamma(nu/2) * ((pi * nu)^(N/2)) * (abs(Si)^(1/2))) * (Kl * exp( (Ri - mu) / Si * zetai )) / ( (sqrt((nu+((Ri - mu)^2) /Si) * (zetai^2) /Si) )^(-(nu+N)/2) * (1+(Ri - mu)^2 / (Si * nu)) ^((nu+N)/2) )
-
-    #     return result
+    #     if abs(zetai) < threshold
+    #         # Formula for the case ξ = 0
+    #         # p(Ri) = Γ((ν+1)/2) / [ Γ(ν/2)* √(π·ν·Si ) ] * [1 + (Ri-μ)² / (ν·Si)]^(-(ν+1)/2)
+    #         return gamma((nu + 1) / 2) / ( gamma(nu / 2) * sqrt(pi * nu * Si) ) *
+    #                ((1 + ((Ri - mu)^2)*nu^(-1)) / Si)^(-(nu + 1) / 2)
+    #     else
+    #         # Formula for the case ξ ≠ 0
+    #         N = 1
+    #         Kl = besselk((nu + N) / 2, sqrt((nu + ((Ri - mu)^2) / Si) * (zetai^2) / Si))
+    #         result = (2^(1 - (nu + N) / 2)) / ( gamma(nu / 2) * ((pi * nu)^(N / 2)) * sqrt(abs(Si)) ) *
+    #         ( Kl * exp( (Ri - mu) / Si * zetai ) ) /
+    #         ( (sqrt((nu + ((Ri - mu)^2) / Si) * (zetai^2) / Si))^(-(nu + N) / 2) *
+    #           (1 + (Ri - mu)^2 / (Si * nu))^((nu + N) / 2) )
+            
+    #         println("p_Ri: For Ri = $Ri, result = $result")
+            
+    #         return result
+            
+    #     end
     # end
 
     function p_Ri(Ri, mu, Si, zetai)
-        threshold = 0.1
-
+        threshold = 0.01
+    
         if abs(zetai) < threshold
-            # Formula for the case ξ = 0
-            # p(Ri) = Γ((ν+1)/2) / [ Γ(ν/2)* √(π·ν·Si ) ] * [1 + (Ri-μ)² / (ν·Si)]^(-(ν+1)/2)
-            return gamma((nu + 1) / 2) / ( gamma(nu / 2) * sqrt(pi * nu * Si) ) *
+            # Formula for the case ξ = 0 (this branch is not activated here)
+            return gamma((nu + 1) / 2) / (gamma(nu / 2) * sqrt(pi * nu * Si)) *
                    ((1 + ((Ri - mu)^2)*nu^(-1)) / Si)^(-(nu + 1) / 2)
         else
             # Formula for the case ξ ≠ 0
             N = 1
-            Kl = besselk((nu + N) / 2, sqrt((nu + ((Ri - mu)^2) / Si) * (zetai^2) / Si))
     
-            return (2^(1 - (nu + N) / 2)) / ( gamma(nu / 2) * ((pi * nu)^(N / 2)) * sqrt(abs(Si)) ) *
-                   ( Kl * exp( (Ri - mu) / Si * zetai ) ) /
-                   ( (sqrt((nu + ((Ri - mu)^2) / Si) * (zetai^2) / Si))^(-(nu + N) / 2) *
-                     (1 + (Ri - mu)^2 / (Si * nu))^((nu + N) / 2) )
+            # Calculate the term inside the square root
+            termA = nu + ((Ri - mu)^2) / Si
+            termB = (zetai^2) / Si
+            sqrt_term = sqrt(termA * termB)
+            println("p_Ri: For Ri = $Ri, termA = $termA sqrt_term = $sqrt_term")
+    
+            # Compute the modified Bessel function value
+            Kl = besselk((nu + N) / 2, sqrt_term)
+            println("p_Ri: For Ri = $Ri, Kl (besselk) = $Kl")
+    
+            # Compute the exponential term
+            exp_term = exp((Ri - mu) / Si * zetai)
+            println("p_Ri: For Ri = $Ri, , mu = $mu, exp_term = $exp_term")
+    
+            # Compute the denominator factor
+            denom_factor = (sqrt_term)^(-(nu + N) / 2) * (1 + (Ri - mu)^2 / (Si * nu))^((nu + N) / 2)
+            #   println("p_Ri: For Ri = $Ri, denom_factor = $denom_factor")
+    
+            # Compute the final result
+            result = (2^(1 - (nu + N) / 2)) / (gamma(nu / 2) * ((pi * nu)^(N / 2)) * sqrt(abs(Si))) *
+                     (Kl * exp_term) / denom_factor
+            println("p_Ri: For Ri = $Ri, final result = $result")
+            
+            return result
         end
     end
 
     # Define P_Ri
     function P_Ri(x, mu, Si, zetai)
+        #println("P_Ri: Computing integral for x = $x, mu = $mu, Si = $Si, zetai = $zetai")
         integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-11)
+        #println("P_Ri: Integral = $integral, error estimate = $err")
         return integral
     end
 
 
     # Define dwP_Ri
     function dwP_Ri(x, mu, Si, zetai)
-        P = P_Ri(x, mu, Si, zetai)
+        P = P_Ri(x, mu, Si, zetai)    
         P = min(P,1)
+        #println("dwP_Ri: For x = $x, computed P = $P")
+        if abs(P) < 1e-10 #P == 0
+            return P = 1e-10 #so we don't get NaN
+        end 
         # dwP_Ri = ((δ * P**(δ-1) * (P**δ + (1-P)**δ))
         #           - P**δ * (P**(δ-1) - (1-P)**(δ-1))) / \
         #          ((P**δ + (1-P)**δ)**(1+1/δ)) * p_Ri(Ri, mu, Si, zetai)
+        numerator = ((δ * P^(δ-1) * (P^δ + (1-P)^δ)) - P^δ * (P^(δ-1) - (1-P)^(δ-1)))
+        denominator = ((P^δ + (1-P)^δ)^(1+1/δ))
+        p_val = p_Ri(x, mu, Si, zetai)
 
-        return ((δ * P^(δ-1) * (P^δ + (1-P)^δ)) - P^δ * (P^(δ-1) - (1-P)^(δ-1))) /((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(x, mu, Si, zetai)
+        #println("dwP_Ri: For x = $x, numerator = $numerator, denominator = $denominator, p_Ri(x) = $p_val")
+    
+        result = numerator / denominator * p_val
+        # println("dwP_Ri: For x = $x, final result = $result")
+        return result
     end
 
-    # # Define dwP_1_Ri
-    # function dwP_1_Ri(Ri, mu, Si, xi)
-    #     P = P_Ri(Ri, mu, Si, xi)
-    #     result = -((δ * (1-P)^(δ-1) * (P^δ + (1-P)^δ)) - (1-P)^δ * ((1-P)^(δ-1) - P^(δ-1))) / ((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(Ri, mu, Si, xi)
+    # function dwP_Ri(x, mu, Si, xi)
+    #     P = P_Ri(x, mu, Si, xi)
+    #     P = min(P,1) # capping at one due to round off errors, whereby P = 1.000000001 is set to P = 1
+    #     # dwP_Ri = ((δ * P**(δ-1) * (P**δ + (1-P)**δ))
+    #     #           - P**δ * (P**(δ-1) - (1-P)**(δ-1))) / \
+    #     #          ((P**δ + (1-P)**δ)**(1+1/δ)) * p_Ri(Ri, mu, Si, xi)
 
-    #     return result
+    #     return ((δ * P^(δ-1) * (P^δ + (1-P)^δ)) - P^δ * (P^(δ-1) - (1-P)^(δ-1))) /((P^δ + (1-P)^δ)^(1+1/δ)) * p_Ri(x, mu, Si, xi)
     # end
-
 
     function dwP_1_Ri(Ri, mu, Si, zetai)
         # Compute P using P_Ri
         P = P_Ri(Ri, mu, Si, zetai)
         P = min(P,1) # capping at one due to round off errors, whereby P = 1.000000001 is set to P = 1
-        
+
+        if abs(P) < 1e-5 #P == 0
+            return P = 1e-10 #so we don't get NaN
+        end
+
         if P == 1
             return result = 0 #so we don't get NaN
         else
@@ -202,19 +252,13 @@ for j = 1:3
             
             # Compute p_Ri for the given inputs
             p_val = p_Ri(Ri, mu, Si, zetai)
-            
+            #println("dwP_1_Ri: For Ri = $Ri, numerator = $numerator, denominator = $denominator, p_Ri(x) = $p_val")
+
             result = numerator / denominator * p_val
+            #println("dwP_1_Ri: For Ri = $Ri, final result = $result")
             return result 
         end
     end
-
-    # Define neg_integral
-    # function neg_integral(mu, Si, zetai, g_i, theta_mi,theta_i_minus1)
-    #     integral, err = quadgk(x -> ((theta_mi * (Rf-x) - theta_i_minus1 * g_i) ^(α-1))* (Rf-x) * dwP_Ri(x, mu, Si, zetai), 
-    #     -100, Rf-theta_i_minus1*g_i/theta_mi, rtol=1e-10)
-
-    #     return integral
-    # end
 
     function neg_integral(mu, Si, zetai, g_i, theta_mi, theta_i_minus1)
         lower_bound = -100
@@ -267,7 +311,7 @@ for j = 1:3
         term1 = (mu[1] + (nu * zetai / (nu-2) - Rf)) - γ̂ * βᵢ * σm ^ 2
         term2 = -α * lamb * b0 * neg_integral(mu[1], Si, zetai, g_i,theta_mi,theta_i_minus1)
         term3 = - α * b0 * pos_integral(mu[1], Si, zetai, g_i,theta_mi,theta_i_minus1)
-        println("Equation35: term1 = $term1, term2 = $term2, term3 = $term3")
+        #println("Equation35: term1 = $term1, term2 = $term2, term3 = $term3")
         return term1 + term2 + term3
     end
 
