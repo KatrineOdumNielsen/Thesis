@@ -24,13 +24,13 @@ figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
 bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = bond_data[['eom', 'cusip', 'ret_exc', 'ret_texc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom', 'price_eom_past', 'offering_date']]
+model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom', 'price_eom_past', 'offering_date']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
 
 #================================== TEST - MAYBE REMOVE============================================
-model_data['ret_exc'] = model_data['ret_texc']
+model_data['ret_exc'] = model_data['ret']
 # ===================================================================    
 #                     a. Set up portfolios by month        
 # ===================================================================
@@ -98,26 +98,33 @@ print("Done calculating monthly portfolio weighted returns.")
 # ===================================================================    
 #            c.  Calculate monthly market weighted returns        
 # ===================================================================
-print("Calculating monthly market weighted returns...")  
-# Function to calculate weighted return for each bond
-def calculate_weighted_return_per_month(df):
-    """
-    For each month, compute each bond's weight, and then the bond-level weighted return.
-    """
-    monthly_sum_mv = df.groupby('eom')['market_value_past'].transform('sum')
-    df['weight'] = df['market_value_past'] / monthly_sum_mv
-    df['weighted_return'] = df['weight'] * df['ret_exc']
-    return df
+# print("Calculating monthly market weighted returns...")  
+# # Function to calculate weighted return for each bond
+# def calculate_weighted_return_per_month(df):
+#     """
+#     For each month, compute each bond's weight, and then the bond-level weighted return.
+#     """
+#     monthly_sum_mv = df.groupby('eom')['market_value_past'].transform('sum')
+#     df['weight'] = df['market_value_past'] / monthly_sum_mv
+#     df['weighted_return'] = df['weight'] * df['ret_exc']
+#     return df
 
-model_data = calculate_weighted_return_per_month(model_data) # Apply the function
+# model_data = calculate_weighted_return_per_month(model_data) # Apply the function
 
-# Now compute the overall market return per month by summing bond-level weighted returns
-market_return_df = (
-    model_data
-    .groupby('eom', as_index=False)['weighted_return']
-    .sum()
-    .rename(columns={'weighted_return': 'market_return'})
+# # Now compute the overall market return per month by summing bond-level weighted returns
+# market_return_df = (
+#     model_data
+#     .groupby('eom', as_index=False)['weighted_return']
+#     .sum()
+#     .rename(columns={'weighted_return': 'market_return'})
+# )
+market_return_df = pd.read_csv(
+    data_folder + "/raw/stock_market_returns.csv", 
+    usecols=[0, 1],  # Select the first two columns
+    names=['eom', 'market_return'],  # Rename the columns
+    header=0  # Use the first row as the header
 )
+market_return_df['eom'] = pd.to_datetime(market_return_df['eom'])
 
 returns_merged = pd.merge(monthly_port_ret_long, market_return_df, on='eom')
 

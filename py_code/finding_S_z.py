@@ -27,7 +27,7 @@ average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics.csv")
 # ===================================================================    
 #                     a. Set up known parameters        
 # ===================================================================
-nu = 17
+nu = 12
 Rf = 1
 
 
