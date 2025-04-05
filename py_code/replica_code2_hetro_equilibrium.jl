@@ -247,6 +247,16 @@ for j = 10:10
         # Find the index of the row with the lowest u_diff
         index_of_min_u_diff = argmin(results_df.utility_diff)
 
+        # Extract the corresponding μ_pot value
+        optimal_mu = results_df[index_of_min_u_diff, :μ_pot]
+
+        
+        # Overwrite μ̂[j] with the optimal μ_pot
+        μ̂[j] = optimal_mu
+
+        # Print the updated μ̂[j]
+        println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])
+
         # Print the row with the lowest u_diff
         println("Row with the lowest u_diff:")
         println(results_df[index_of_min_u_diff, :])

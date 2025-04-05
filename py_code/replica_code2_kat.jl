@@ -124,7 +124,7 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 
 
 ## list for bounds of integrals
-bound = [100,71,21]
+bound = [20,20,20]
 
 for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
@@ -296,101 +296,160 @@ for j = 1:3
 
     result2 = optimize(θᵢ  -> Equation20(θᵢ,μ̂[j]), -theta_mi, theta_mi*2)
     θ̂ᵢ[j] = Optim.minimizer(result2)[1]
+
+    println("$j theta is ", θ̂ᵢ[j])
+    println("$j mu is ", μ̂[j])
+    if abs(θ̂ᵢ[j] - theta_mi) < 0.00001
+        println("$j is a homogeneous equilibrium")
+    elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
+        println("$j is a heterogeneous equilibrium")
+
+        μ_pot = LinRange(μ̂[j]-0.05,μ̂[j]+0.05,100)
+        using DataFrames, Optim
+
+        # Create a DataFrame to store the results
+        results_df = DataFrame(μ_pot = Float64[], opt_theta_low = Float64[], opt_theta_high = Float64[], utility_low = Float64[], utility_high = Float64[], utility_diff = Float64[])
+        
+        # Iterate over all μ_pot values
+        for (i, μ_pot_i) in enumerate(μ_pot)
+            try
+                println("Processing iteration $i out of $(length(μ_pot)) with μ_pot_i = $μ_pot_i")
+            
+                # Optimize for the range [0, theta_mi]
+                result_low = optimize(θᵢ -> Equation20(θᵢ, μ_pot_i), 0, theta_mi - 0.0001)
+                opt_theta_low = Optim.minimizer(result_low)[1]  # Extract the optimal theta for the low range
+            
+                # Optimize for the range [theta_mi, 1]
+                result_high = optimize(θᵢ -> Equation20(θᵢ, μ_pot_i), theta_mi + 0.0001, 1.0)
+                opt_theta_high = Optim.minimizer(result_high)[1]  # Extract the optimal theta for the high range
+            
+                # Calculate utilities
+                utility_low = Equation20(opt_theta_low, μ_pot_i)  # Utility for opt_theta_low
+                utility_high = Equation20(opt_theta_high, μ_pot_i)  # Utility for opt_theta_high
+            
+                # Calculate the difference between the two utilities
+                utility_diff = abs(utility_low - utility_high)
+            
+                # Add the results to the DataFrame
+                push!(results_df, (μ_pot_i, opt_theta_low, opt_theta_high, utility_low, utility_high, utility_diff))
+            catch e
+                println("Error in iteration $i: ", e)
+                continue  # Skip to the next iteration if an error occurs
+            end
+        end
+        println(results_df)
+        # Find the index of the row with the lowest u_diff
+        index_of_min_u_diff = argmin(results_df.utility_diff)
+
+        # Extract the corresponding μ_pot value
+        optimal_mu = results_df[index_of_min_u_diff, :μ_pot]
+
+        # Overwrite μ̂[j] with the optimal μ_pot
+        μ̂[j] = optimal_mu
+
+        # Print the updated μ̂[j]
+        println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])
+
+        # Print the row with the lowest u_diff
+        println("Row with the lowest u_diff:")
+        println(results_df[index_of_min_u_diff, :])
+    end
+
     
     println("done with portfolio ",j)
 
-    #println("done with optimization, now looking at plots")
+    println("done with optimization, now looking at plots")
 
-    # #%% Draw Figure 3 for portfolio j
-    # function Equation20(θᵢ,μ̂)
+    #%% Draw Figure 3 for portfolio j
+    function Equation20(θᵢ,μ̂)
 
-    #     term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    #     term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-    #     term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
-    #     return -(term1 + term2 + term3)
-    # end
+        return -(term1 + term2 + term3)
+    end
     
-    # #θᵢ_rand = LinRange(0.00001,0.002,50)
-    # θᵢ_rand = LinRange(0.0001,0.02,100)
-    # u_rand = Equation20.(θᵢ_rand,μ̂[j])
+    #θᵢ_rand = LinRange(0.00001,0.002,50)
+    θᵢ_rand = LinRange(0.0001,0.02,100)
+    u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
-    # #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-    # θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
-    # u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
+    #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
+    θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+    u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
-    # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-    # u_rand_all = [u_rand_neg; u_rand]
+    θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+    u_rand_all = [u_rand_neg; u_rand]
 
-    # #   Plot graphs
-    # # gr()
-    # # Plots.GRBackend()
-    # pyplot()
-    # Plots.PyPlotBackend()
-    # plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
-    # xlabel!("θ₁", xguidefontsize=10)
-    # ylabel!("utility", yguidefontsize=10)
-    # title!("Objective function of Equation 20", titlefontsize=10)
-    # savefig("Figure3_kat_portfolio$(j).png")
+    #   Plot graphs
+    # gr()
+    # Plots.GRBackend()
+    pyplot()
+    Plots.PyPlotBackend()
+    plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
+    xlabel!("θ₁", xguidefontsize=10)
+    ylabel!("utility", yguidefontsize=10)
+    title!("Objective function of Equation 20", titlefontsize=10)
+    savefig("Figure3_kat_portfolio$(j).png")
 
-    # println("done with fig 3, starting on fig 4")
-    # #%% Draw Figure 4 for portfolio j
-    # function Equation20(θᵢ,μ̂)
+    println("done with fig 3, starting on fig 4")
+    #%% Draw Figure 4 for portfolio j
+    function Equation20(θᵢ,μ̂)
 
-    #     term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    #     term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-    #     term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
-    #     return -(term1 + term2 + term3)
-    # end
+        return -(term1 + term2 + term3)
+    end
 
-    # function Equation20_MV(θᵢ,μ̂)
+    function Equation20_MV(θᵢ,μ̂)
 
-    #     term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    #     # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-    #     # term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        # term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
-    #     return -(term1)
-    # end
+        return -(term1)
+    end
 
-    # function Equation20_PT(θᵢ,μ̂)
+    function Equation20_PT(θᵢ,μ̂)
 
-    #     # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-    #     term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-    #     term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
-    #     return -(term2 + term3)
-    # end
+        return -(term2 + term3)
+    end
     
-    # hetro_mu = 0.5405 #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
+    hetro_mu = μ̂[j] #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
 
-    # θᵢ_rand = LinRange(0.0001,0.25,100)
-    # u_rand = Equation20.(θᵢ_rand,hetro_mu)
-    # MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
-    # PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
+    θᵢ_rand = LinRange(0.0001,1.25,100)
+    u_rand = Equation20.(θᵢ_rand,hetro_mu)
+    MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
+    PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
 
-    # θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
-    # u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
-    # MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
-    # PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
+    θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+    u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
+    MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
+    PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
 
-    # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-    # u_rand_all = [u_rand_neg; u_rand]
-    # MV_rand_all = [MV_rand_neg; MV_rand]
-    # PT_rand_all = [PT_rand_neg; PT_rand]
+    θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+    u_rand_all = [u_rand_neg; u_rand]
+    MV_rand_all = [MV_rand_neg; MV_rand]
+    PT_rand_all = [PT_rand_neg; PT_rand]
 
-    # #   Plot graphs
-    # # gr()
-    # # Plots.GRBackend()
-    # pyplot()
-    # Plots.PyPlotBackend()
-    # plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
-    # plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-    # plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-    # xlabel!("θ₁", xguidefontsize=10)
-    # ylabel!("utility", yguidefontsize=10)
-    # title!("Objective function for Decile 1", titlefontsize=10)
-    # savefig("Figure4_kat_portfolio$(j).png")
+    #   Plot graphs
+    # gr()
+    # Plots.GRBackend()
+    pyplot()
+    Plots.PyPlotBackend()
+    plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
+    plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+    plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+    xlabel!("θ₁", xguidefontsize=10)
+    ylabel!("utility", yguidefontsize=10)
+    title!("Objective function for Decile 1", titlefontsize=10)
+    savefig("Figure4_kat_portfolio$(j).png")
 
 end
 println(μ̂,)
