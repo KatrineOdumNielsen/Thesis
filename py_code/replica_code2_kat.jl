@@ -10,7 +10,6 @@
 #
 #
 # ======================================================================================================================
-
 ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
 ENV["SSL_CERT_FILE"] = ""
 
@@ -93,7 +92,7 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 #mu = 0.005
 
 ## =========== Our parameters ============= ##
-nu = 12 #changed
+nu = 17 #changed
 σm = 0.08 #changed
 Rf = 1 #unchanged
 
@@ -262,7 +261,7 @@ for j = 2:2
     end
 
     function neg_integral(mu, Si, zetai, g_i, theta_mi, theta_i_minus1)
-        lower_bound = -50
+        lower_bound = -90
         upper_bound = Rf - theta_i_minus1 * g_i / theta_mi
         #println("neg_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (Rf - x) - theta_i_minus1 * g_i)^(α - 1)) *
@@ -275,7 +274,7 @@ for j = 2:2
     # Define pos_integral
     function pos_integral(mu, Si, zetai, g_i, theta_mi,theta_i_minus1)
         lower_bound = Rf - theta_i_minus1 * g_i / theta_mi
-        upper_bound = 50
+        upper_bound = 90
         #println("pos_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * g_i) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai), 
         
@@ -287,9 +286,9 @@ for j = 2:2
     # Define neg_integral in Equation 20
     function neg_integral20(θᵢ, mu, Si, zetai, g_i,theta_i_minus1,lamb, b0)
         if θᵢ >= 0
-            integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, zetai), -50, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-8)
+            integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, zetai), -90, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-8)
         elseif θᵢ < 0
-            integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, zetai), -50, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-8)
+            integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, zetai), -90, Rf-theta_i_minus1*g_i/θᵢ, rtol=1e-8)
         end
         #println("neg_integral20: Result = $integral, error estimate = $err")
         return integral
@@ -298,9 +297,9 @@ for j = 2:2
     # Define pos_integral in Equation 20
     function pos_integral20(θᵢ, mu, Si, zetai, g_i,theta_i_minus1,lamb, b0)
         if θᵢ >= 0
-            integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*g_i/θᵢ, 50, rtol=1e-8)
+            integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*g_i/θᵢ, 90, rtol=1e-8)
         elseif θᵢ < 0
-            integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*g_i/θᵢ, 50, rtol=1e-8)
+            integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), Rf-theta_i_minus1*g_i/θᵢ, 90, rtol=1e-8)
         end
         #println("pos_integral20: Result = $integral, error estimate = $err")
         return integral
