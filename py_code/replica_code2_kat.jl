@@ -299,7 +299,7 @@ for j = 1:3
     
     println("done with portfolio ",j)
 
-    println("done with optimization, now looking at plots")
+    #println("done with optimization, now looking at plots")
 
     # #%% Draw Figure 3 for portfolio j
     # function Equation20(θᵢ,μ̂)
