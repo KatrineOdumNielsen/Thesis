@@ -124,7 +124,7 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 
 
 ## list for bounds of integrals
-bound = [100,90,45]
+bound = [100,71,21]
 
 for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
@@ -225,7 +225,7 @@ for j = 1:3
         #println("neg_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (Rf - x) - theta_i_minus1 * g_i)^(α - 1)) *
                                  (Rf - x) * dwP_Ri(x, mu, Si, zetai),
-                                 lower_bound, upper_bound, rtol=1e-5)
+                                 lower_bound, upper_bound, rtol=1e-4)
         #println("neg_integral: Result = $integral, error estimate = $err")
         return integral
     end
@@ -236,7 +236,7 @@ for j = 1:3
         upper_bound = U_bound
         #println("pos_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * g_i) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai), 
-        lower_bound, upper_bound, rtol=1e-5)
+        lower_bound, upper_bound, rtol=1e-4)
         #println("pos_integral: Result = $integral, error estimate = $err")
         return integral
     end
@@ -247,10 +247,10 @@ for j = 1:3
         upper_bound = Rf-theta_i_minus1*g_i/θᵢ
         if θᵢ >= 0
             integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-5)
+            lower_bound, upper_bound, rtol=1e-4)
         elseif θᵢ < 0
             integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-5)
+            lower_bound, upper_bound, rtol=1e-4)
         end
         #println("neg_integral20: Result = $integral, error estimate = $err")
         return integral
@@ -262,10 +262,10 @@ for j = 1:3
         upper_bound = U_bound
         if θᵢ >= 0
             integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-5)
+            lower_bound, upper_bound, rtol=1e-4)
         elseif θᵢ < 0
             integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-5)
+            lower_bound, upper_bound, rtol=1e-4)
         end
         #println("pos_integral20: Result = $integral, error estimate = $err")
         return integral
@@ -299,7 +299,7 @@ for j = 1:3
     
     println("done with portfolio ",j)
 
-    #println("done with optimization, now looking at plots")
+    println("done with optimization, now looking at plots")
 
     # #%% Draw Figure 3 for portfolio j
     # function Equation20(θᵢ,μ̂)
@@ -312,7 +312,7 @@ for j = 1:3
     # end
     
     # #θᵢ_rand = LinRange(0.00001,0.002,50)
-    # θᵢ_rand = LinRange(0.0001,0.25,1000)
+    # θᵢ_rand = LinRange(0.0001,0.02,100)
     # u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
     # #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
