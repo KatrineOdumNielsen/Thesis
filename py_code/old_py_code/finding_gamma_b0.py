@@ -9,7 +9,7 @@ target_ep = 0.015         # Target equity premium (gross excess return): 1.5%
 target_ud = 0.6           # Target under-diversification measure (choose based on empirical estimates)
 
 # Other model parameters (adjust as needed)
-nu = 8                    # Example: degrees of freedom for the t distribution
+nu = 17                   # Example: degrees of freedom for the t distribution
 sigma_m = 0.08            # Example: market volatility
 Ri_initial = 0.01         # Initial value for Ri (if used in your equilibrium calculation)
 mu_initial = 0.005        # Initial guess for μ (if needed)

@@ -97,7 +97,7 @@ nu = 17 #changed
 σm = 0.08 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (0.6, 0.6) #unchanged
+γ̂, b0 = (0.8, 0.4) #unchanged
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -389,10 +389,11 @@ for j = 1:3
     plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
     xlabel!("θ₁", xguidefontsize=10)
     ylabel!("utility", yguidefontsize=10)
-    title!("Objective function of Equation 20", titlefontsize=10)
-    savefig("Figure3_kat_portfolio$(j).png")
+    title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
+    savefig(joinpath("figures","Figure3_kat_portfolio$(j).png"))
 
     println("done with fig 3, starting on fig 4")
+
     #%% Draw Figure 4 for portfolio j
     function Equation20(θᵢ,μ̂)
 
@@ -448,8 +449,8 @@ for j = 1:3
     plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
     xlabel!("θ₁", xguidefontsize=10)
     ylabel!("utility", yguidefontsize=10)
-    title!("Objective function for Decile 1", titlefontsize=10)
-    savefig("Figure4_kat_portfolio$(j).png")
+    title!("Objective function for portfolio $(j)", titlefontsize=10)
+    savefig(joinpath("figures", "Figure4_kat_portfolio$(j).png"))
 
 end
 println(μ̂,)
