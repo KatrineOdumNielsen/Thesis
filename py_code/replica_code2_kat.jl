@@ -97,7 +97,7 @@ nu = 17 #changed
 σm = 0.08 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (0.8, 0.4) #unchanged
+γ̂, b0 = (4, 0.5) #unchanged
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -121,12 +121,12 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 # θ̂ᵢ = zeros(10,1)
 μ̂ = zeros(3,1)
 θ̂ᵢ = zeros(3,1)
-
+exp_exc_ret = zeros(3,1)
 
 ## list for bounds of integrals
 bound = [20,20,20]
 
-for j = 3:3
+for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]
@@ -343,7 +343,7 @@ for j = 3:3
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.05,μ̂[j]+0.05,100)
+        μ_pot = LinRange(μ̂[j]-0.01,μ̂[j],30)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -424,12 +424,12 @@ for j = 3:3
         
         hetro_mu = μ̂[j] #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
 
-        θᵢ_rand = LinRange(0.0001,1.25,100)
+        θᵢ_rand = LinRange(0.0005,0.75,100)
         u_rand = Equation20.(θᵢ_rand,hetro_mu)
         MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
         PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
 
-        θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+        θᵢ_rand_neg = LinRange(-0.01,-0.75,100)
         u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
         MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
         PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
@@ -444,14 +444,17 @@ for j = 3:3
         # Plots.GRBackend()
         pyplot()
         Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,1.25), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,leg = false, dpi=300)
         xlabel!("θ₁", xguidefontsize=10)
         ylabel!("utility", yguidefontsize=10)
         title!("Objective function for portfolio $(j)", titlefontsize=10)
         savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
 
     end
-println("Done with code")
+    exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
+    println("Done with portfolio $j")
 end
+println(exp_exc_ret)
+println("Done with code")
