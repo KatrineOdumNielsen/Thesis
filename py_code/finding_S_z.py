@@ -43,18 +43,10 @@ print("\nAverage proportions across all months:")
 print(avg_portfolio_props)
 
 #Rounds the average proportions to even numbers
-N = 100
-pr_DI = 3
-pr_HY = 19
-pr_IG = 78
-# N = 1000
-# pr_DI = 30
-# pr_HY = 190
-# pr_IG = 780
-# N = 5000
-# pr_DI = 150
-# pr_HY = 950
-# pr_IG = 3900
+N = 1000
+pr_DI = 30
+pr_HY = 190
+pr_IG = 780
 
 # For each month and portfolio, sum the market_value_past
 monthly_mv = (model_data_cgo.groupby(['eom', 'portfolio'])['market_value_past'].sum().reset_index()) #Finds the total market value of each portfolio during that month
