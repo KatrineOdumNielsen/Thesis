@@ -125,9 +125,9 @@ exp_exc_ret = zeros(3,1)
 
 
 ## list for bounds of integrals
-bound = [20,20,20]
+bound = [20,20,15]
 
-for j = 1:3
+for j = 3:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]

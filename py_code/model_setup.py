@@ -197,62 +197,7 @@ plt.close()
 print("Calculating capital gain overhang (CGO)...")
 monthly_turnover = 0.015 #using quarterly turnover of 4.5% from Peter's paper
 
-# def compute_effective_purchase_price_linear(group):
-#     """
-#     For a given bond (grouped by 'cusip'), compute the effective purchase price and capital gain overhang for each month
-#     using linear decaying weights.
-    
-#     For the first observation, we set the effective price equal to the current price (CGO = 0%).
-#     For subsequent observations, we compute weights linearly as:
-#         weight(k) = 1 - monthly_turnover * (k - 1)
-#     for k = 1,2,..., where k=1 corresponds to the most recent past observation.
-#     The weights are then reversed (to align with past_prices order) and normalized.
-#     """
-#     group = group.sort_values('eom').copy()
-    
-#     # For the first observation, set effective price equal to current price, and CGO = 0%
-#     effective_prices = [group.iloc[0]['price_eom_past']]
-#     cgo_values = [0.0]
-    
-#     for i in range(1, len(group)):
-#         past_prices = group.iloc[:i]['price_eom_past'].values
-#         n = len(past_prices)
-#         k_values = np.arange(1, n+1)  # k = 1, 2, ..., n
-#         weights = 1 - monthly_turnover * (k_values - 1) # Linear weights: most recent gets weight = 1
-#         weights = weights[::-1]  # Reverse weights so the most recent observation gets the highest weight
-#         weights = weights / np.sum(weights)   # Normalize so weights sum to 1
-#         effective_price = np.sum(weights * past_prices)
-#         effective_prices.append(effective_price)
-#         current_price = group.iloc[i]['price_eom_past']
-#         cgo = (current_price / effective_price - 1) * 100
-#         cgo_values.append(cgo)
-    
-#     group['effective_price'] = effective_prices
-#     group['cap_gain_overhang'] = cgo_values
-#     return group
-
-# To switch back to the exponential method, use the code below:
-# def compute_effective_purchase_price_exponential(group):
-#     group = group.sort_values('eom').copy()
-#     effective_prices = [group.iloc[0]['price_eom_past']]
-#     cgo_values = [0.0]
-#     for i in range(1, len(group)):
-#         past_prices = group.iloc[:i]['price_eom_past'].values
-#         n = len(past_prices)
-#         k_values = np.arange(1, n+1)
-#         weights = monthly_turnover * (1 - monthly_turnover)**(k_values - 1)
-#         weights = weights[::-1]
-#         weights = weights / np.sum(weights)
-#         effective_price = np.sum(weights * past_prices)
-#         effective_prices.append(effective_price)
-#         current_price = group.iloc[i]['price_eom_past']
-#         cgo = (current_price / effective_price - 1) * 100
-#         cgo_values.append(cgo)
-#     group['effective_price'] = effective_prices
-#     group['cap_gain_overhang'] = cgo_values
-#     return group
-
-def compute_effective_purchase_price_exponential_earliest(group):
+def compute_effective_purchase_price_exponential(group):
     """
     For a given bond (grouped by 'cusip'), compute the effective purchase price and 
     capital gain overhang for each month, using an exponentially decaying approach 
@@ -312,7 +257,7 @@ def compute_effective_purchase_price_exponential_earliest(group):
 
 print('Applying the function group-wise by bond (cusip) ...')
 model_data = model_data.sort_values(['cusip', 'eom'])
-model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_exponential_earliest).reset_index(drop=True)
+model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_exponential).reset_index(drop=True)
 model_data.to_csv("data/preprocessed/model_data_cgo.csv")
 model_data.to_csv(os.path.join(data_folder + "/preprocessed/model_data_cgo.csv"), index=False)
 
@@ -322,16 +267,7 @@ monthly_cgo = (
     .median() # Use median rather than mean, maybe change
     .reset_index()
 )
-print("Monthly Median Capital Gain Overhang by Portfolio:")
-print(monthly_cgo.head())
 
-# Extract the year from the end-of-month dates, and then group by year and portfolio
-# monthly_cgo['year'] = monthly_cgo['eom'].dt.year
-# annual_cgo = (
-#     monthly_cgo.groupby(['year', 'portfolio'])['cap_gain_overhang']
-#     .median() # Use median rather than mean, maybe change
-#     .reset_index()
-# )
 print("Done calculating capital gain overhang (CGO).")
 
 # =============================================================================
@@ -339,35 +275,6 @@ print("Done calculating capital gain overhang (CGO).")
 # =============================================================================
 print("Calculating volatility and skewness...")
 model_data = model_data.sort_values(['cusip', 'eom'])
-
-# def compute_vol_skew(group, window=12, min_periods=3):
-#     group = group.sort_values('eom').copy()
-#     vol_list = []
-#     skew_list = []
-#     for i in range(len(group)):
-#         # Use the last 'window' months (or fewer if at the beginning)
-#         window_data = group.iloc[max(0, i - window + 1):i + 1]['ret_exc']
-#         if len(window_data) < min_periods:
-#             vol_list.append(np.nan)
-#             skew_list.append(np.nan)
-#         else:
-#             # Compute sample standard deviation and skewness
-#             vol_list.append(np.nanstd(window_data, ddof=1))
-#             skew_list.append(skew(window_data, nan_policy='omit'))
-#     group['volatility'] = vol_list
-#     group['skewness'] = skew_list
-#     return group
-
-# model_data = model_data.groupby('cusip').apply(compute_vol_skew, window=12, min_periods=3).reset_index(drop=True)
-
-# model_data.to_csv((data_folder + "/preprocessed/model_data.csv"), index=False)
-# print("Updated model_data with volatility and skewness saved.")
-
-# monthly_vol_skew = model_data.groupby(['eom', 'portfolio']).agg(
-#     volatility = ('volatility', 'mean'),
-#     skewness   = ('skewness', 'mean')
-# ).reset_index()
-
 
 model_data['ret_exc'] = model_data['ret_exc']
 model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
@@ -433,11 +340,12 @@ print("Final monthly dataset created.")
 # =============================================================================
 print("Obtaining average values for each bond portfolio...")
 average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
-average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
+#average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
 print("Average metrics per bond portfolio:")
 print(average_metrics)
 
 median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
+median_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
 print("Median metrics per bond portfolio:")
 print(median_metrics)
 
