@@ -289,7 +289,7 @@ def compute_annual_return(bond_df):
     bond_df = bond_df.sort_values('eom').reset_index(drop=True)
     annual_returns = []
     for i in range(len(bond_df)):
-        if i + 12 <= len(bond_df):
+        if i - 12 <= len(bond_df):
             window = bond_df.loc[i:i+11, 'log_ret']
             annual_ret = np.exp(window.sum()) - 1
         else:
@@ -340,12 +340,11 @@ print("Final monthly dataset created.")
 # =============================================================================
 print("Obtaining average values for each bond portfolio...")
 average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
-#average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
+average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
 print("Average metrics per bond portfolio:")
 print(average_metrics)
 
 median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
-median_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
 print("Median metrics per bond portfolio:")
 print(median_metrics)
 
