@@ -62,71 +62,104 @@ print("Done setting up portfolios")
 # ===================================================================    
 #             b. Calculate monthly portfolio weighted returns        
 # ===================================================================
-print("Calculating monthly portfolio weighted returns...")   
-# Function to calculate weighted return for each bond
-def calculate_monthly_weighted_return(month_data):
-    """
-    Given a DataFrame for a single month compute each bond's portfolio weight 
-    and weighted return, then sum over each portfolio to get final monthly returns.
-    """
-    # 1) For each row, get the sum of 'market_value_past' in that row's portfolio
-    sum_portfolio_mv_past = month_data.groupby('portfolio')['market_value_past'].transform('sum')
+# Get sorted unique month-end dates
+dates = sorted(bond_data['eom'].unique())
+date_series = []  # Store the dates for which we compute returns
+
+# Define the groups for which we compute returns
+groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
+
+# Initialize dictionaries/lists to store returns
+group_returns = {grp: [] for grp in groups}
+di_returns = []  # For distressed bonds
+market_returns = []
+
+# Loop over each month (each date)
+for dt in dates:
+    date_series.append(dt)
+    current_period = bond_data[bond_data['eom'] == dt]
     
-    # 2) Compute each bond's weight within its portfolio
-    month_data['portfolio_weight'] = month_data['market_value_past'] / sum_portfolio_mv_past
+    # For each group (IG and HY), compute the market-weighted return.
+    for grp in groups:
+        group_data = current_period[current_period['rating_class_past'] == grp]
+        total_mv = group_data['market_value_past'].sum()
+        
+        if len(group_data) > 0 and total_mv > 0:
+            weights = group_data['market_value_past'] / total_mv
+            weighted_return = (weights * group_data['ret_exc']).sum()
+        else:
+            weighted_return = 0
+        
+        group_returns[grp].append(weighted_return)
     
-    # 3) Multiply each bond’s weight by its return
-    month_data['weighted_return'] = month_data['portfolio_weight'] * month_data['ret_exc']
+    # For distressed bonds: subset of HY where is_distressed == True.
+    distressed_data = current_period[current_period['distressed_spread_past'] == True]
+    total_mv_di = distressed_data['market_value_past'].sum()
+    if len(distressed_data) > 0 and total_mv_di > 0:
+        weights_di = distressed_data['market_value_past'] / total_mv_di
+        weighted_return_di = (weights_di * distressed_data['ret_exc']).sum()
+    else:
+        weighted_return_di = 0
+    di_returns.append(weighted_return_di)
     
-    # 4) Sum weighted returns by portfolio to get the final monthly returns
-    monthly_returns = month_data.groupby('portfolio')['weighted_return'].sum()
-    
-    return monthly_returns
+    # New section: compute total market-weighted return (across all bonds)
+    total_mv_all = current_period['market_value_past'].sum()
+    if len(current_period) > 0 and total_mv_all > 0:
+        weights_all = current_period['market_value_past'] / total_mv_all
+        weighted_return_all = (weights_all * current_period['ret_exc']).sum()
+    else:
+        weighted_return_all = 0
+    market_returns.append(weighted_return_all)
 
-monthly_portfolio_returns = {}
-for m, df in portfolio_by_month.items():
-    returns_this_month = calculate_monthly_weighted_return(df)
-    monthly_portfolio_returns[m] = returns_this_month
+# 2. Create DataFrames for Returns
+# Create a DataFrame for monthly returns using the computed lists.
+returns_df = pd.DataFrame(group_returns, index=date_series)  
+returns_df['2.DI'] = di_returns 
+returns_df['market'] = market_returns
+returns_merged = returns_df
+returns_df.index.name = 'date'
 
-# Convert the result in to a DataFrame.
-monthly_port_ret = pd.DataFrame(monthly_portfolio_returns).T
-monthly_port_ret.index.name = 'eom'
-monthly_port_ret = monthly_port_ret.reset_index()
-monthly_port_ret_long = monthly_port_ret.melt(id_vars='eom', var_name='portfolio', value_name='weighted_return')
+# Add a row on 2002-07-31 with values of 0 for all columns
+returns_df = returns_df.sort_index()
+returns_df.index = pd.to_datetime(returns_df.index)
 
-print("Done calculating monthly portfolio weighted returns.")
-# ===================================================================    
-#            c.  Calculate monthly market weighted returns        
-# ===================================================================
-# print("Calculating monthly market weighted returns...")  
-# # Function to calculate weighted return for each bond
-# def calculate_weighted_return_per_month(df):
-#     """
-#     For each month, compute each bond's weight, and then the bond-level weighted return.
-#     """
-#     monthly_sum_mv = df.groupby('eom')['market_value_past'].transform('sum')
-#     df['weight'] = df['market_value_past'] / monthly_sum_mv
-#     df['weighted_return'] = df['weight'] * df['ret_exc']
-#     return df
+# Reset index so 'date' becomes a column
+returns_df_reset = returns_df.reset_index()
 
-# model_data = calculate_weighted_return_per_month(model_data) # Apply the function
-
-# # Now compute the overall market return per month by summing bond-level weighted returns
-# market_return_df = (
-#     model_data
-#     .groupby('eom', as_index=False)['weighted_return']
-#     .sum()
-#     .rename(columns={'weighted_return': 'market_return'})
-# )
-market_return_df = pd.read_csv(
-    data_folder + "/raw/stock_market_returns.csv", 
-    usecols=[0, 1],  # Select the first two columns
-    names=['eom', 'market_return'],  # Rename the columns
-    header=0  # Use the first row as the header
+# Melt the DataFrame to long format for the portfolios (excluding 'market')
+long_returns = returns_df_reset.melt(
+    id_vars='date',
+    value_vars=['0.IG', '1.HY', '2.DI'],
+    var_name='portfolio',
+    value_name='weighted_return'
 )
-market_return_df['eom'] = pd.to_datetime(market_return_df['eom'])
 
-returns_merged = pd.merge(monthly_port_ret_long, market_return_df, on='eom')
+# Merge the market return onto the long dataframe
+long_returns['market_return'] = long_returns['date'].map(
+    returns_df['market']
+)
+
+long_returns = long_returns.sort_values(['date', 'portfolio']).reset_index(drop=True)
+# Replace portfolio names
+long_returns['portfolio'] = long_returns['portfolio'].replace({
+    '0.IG': 'IG',
+    '1.HY': 'HY',
+    '2.DI': 'DI'
+})
+
+# Set portfolio as a categorical with custom order
+long_returns['portfolio'] = pd.Categorical(
+    long_returns['portfolio'],
+    categories=['DI', 'HY', 'IG'],
+    ordered=True
+)
+
+# Sort first by portfolio, then by date
+long_returns = long_returns.sort_values(['portfolio', 'date']).reset_index(drop=True)
+long_returns.rename(columns={'date': 'eom'}, inplace=True)
+returns_merged = long_returns
+monthly_port_ret_long = long_returns.iloc[:, :3]
+market_return_df = long_returns[['eom', 'market_return']]
 
 print("Done calculating monthly market weighted returns.")
 # ===================================================================    
