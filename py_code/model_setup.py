@@ -24,10 +24,9 @@ figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
 bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_past', 'rating_class_past', 'market_value_past', 'price_eom', 'price_eom_past', 'offering_date']]
+model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
-model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
 
 #================================== TEST - MAYBE REMOVE============================================
 model_data['ret_exc'] = model_data['ret']
@@ -42,17 +41,17 @@ portfolio_by_month = {}
 for month in sorted(unique_months):
     month_data = model_data[model_data['eom'] == month].copy()
     # Assign portfolios for this month based on credit spread and rating class
-    month_data.loc[month_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
-    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_past'] == '0.IG'), 'portfolio'] = 'IG'
-    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_past'] == '1.HY'), 'portfolio'] = 'HY'
+    month_data.loc[month_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
+    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
     month_data.loc[month_data['portfolio'].isnull(), 'portfolio'] = 'Other'
     portfolio_by_month[month] = month_data # Save the DataFrame for this month
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
-model_data.loc[model_data['credit_spread_past'] > 0.1, 'portfolio'] = 'DI'
-model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_past'] == '0.IG'), 'portfolio'] = 'IG'
-model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_past'] == '1.HY'), 'portfolio'] = 'HY'
+model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
+model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 model_data.to_csv("data/preprocessed/model_data.csv")
 print("Done setting up portfolios")
 
@@ -81,11 +80,11 @@ for dt in dates:
     
     # For each group (IG and HY), compute the market-weighted return.
     for grp in groups:
-        group_data = current_period[current_period['rating_class_past'] == grp]
-        total_mv = group_data['market_value_past'].sum()
+        group_data = current_period[current_period['rating_class_start'] == grp]
+        total_mv = group_data['market_value_start'].sum()
         
         if len(group_data) > 0 and total_mv > 0:
-            weights = group_data['market_value_past'] / total_mv
+            weights = group_data['market_value_start'] / total_mv
             weighted_return = (weights * group_data['ret_exc']).sum()
         else:
             weighted_return = 0
@@ -93,19 +92,19 @@ for dt in dates:
         group_returns[grp].append(weighted_return)
     
     # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed_spread_past'] == True]
-    total_mv_di = distressed_data['market_value_past'].sum()
+    distressed_data = current_period[current_period['distressed_spread_start'] == True]
+    total_mv_di = distressed_data['market_value_start'].sum()
     if len(distressed_data) > 0 and total_mv_di > 0:
-        weights_di = distressed_data['market_value_past'] / total_mv_di
+        weights_di = distressed_data['market_value_start'] / total_mv_di
         weighted_return_di = (weights_di * distressed_data['ret_exc']).sum()
     else:
         weighted_return_di = 0
     di_returns.append(weighted_return_di)
     
     # New section: compute total market-weighted return (across all bonds)
-    total_mv_all = current_period['market_value_past'].sum()
+    total_mv_all = current_period['market_value_start'].sum()
     if len(current_period) > 0 and total_mv_all > 0:
-        weights_all = current_period['market_value_past'] / total_mv_all
+        weights_all = current_period['market_value_start'] / total_mv_all
         weighted_return_all = (weights_all * current_period['ret_exc']).sum()
     else:
         weighted_return_all = 0
@@ -409,7 +408,7 @@ sns.histplot(
     color=cmap(1)  # Using one color from the reversed colormap
 )
 plt.xlabel('Capital Gain Overhang (%)')
-plt.title('Distribution of Capital Gain Overhang (using price_eom_past)')
+plt.title('Distribution of Capital Gain Overhang (using price_eom_start)')
 plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "cgo_distribution.png"))
 plt.close()

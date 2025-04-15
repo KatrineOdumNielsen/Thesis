@@ -49,11 +49,11 @@ pr_HY = 190
 pr_IG = 780
 
 # For each month and portfolio, sum the market_value_past
-monthly_mv = (model_data_cgo.groupby(['eom', 'portfolio'])['market_value_past'].sum().reset_index()) #Finds the total market value of each portfolio during that month
-overall_monthly = (model_data_cgo.groupby('eom')['market_value_past'].sum().reset_index()) #Finds the total market value of all bonds during that month
-avg_portfolio_mv = monthly_mv.groupby('portfolio')['market_value_past'].mean().reset_index() #Takes the average market value of each portfolio across all months
-overall_avg_mv = overall_monthly['market_value_past'].mean() #Takes the average market value of all bonds across all months
-avg_portfolio_mv['weight'] = avg_portfolio_mv['market_value_past'] / overall_avg_mv #Calculates the weight of each portfolio
+monthly_mv = (model_data_cgo.groupby(['eom', 'portfolio'])['market_value_start'].sum().reset_index()) #Finds the total market value of each portfolio during that month
+overall_monthly = (model_data_cgo.groupby('eom')['market_value_start'].sum().reset_index()) #Finds the total market value of all bonds during that month
+avg_portfolio_mv = monthly_mv.groupby('portfolio')['market_value_start'].mean().reset_index() #Takes the average market value of each portfolio across all months
+overall_avg_mv = overall_monthly['market_value_start'].mean() #Takes the average market value of all bonds across all months
+avg_portfolio_mv['weight'] = avg_portfolio_mv['market_value_start'] / overall_avg_mv #Calculates the weight of each portfolio
 weight_DI = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'DI', 'weight'].values[0] #Assigns the weight of DI
 weight_HY = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'HY', 'weight'].values[0] #Assigns the weight of HY
 weight_IG = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'IG', 'weight'].values[0] #Assigns the weight of IG

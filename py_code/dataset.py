@@ -130,11 +130,11 @@ bond_data_large["credit_spread"] = bond_data_large['yield'] - bond_data_large['i
 # Adding rating, group and price data from last period
 rating_data = wrds_data[['eom', 'cusip', 'rating_num', 'rating_class', 'price_eom']]
 rating_data = rating_data.sort_values(by=['cusip', 'eom'])
-rating_data['rating_num_past'] = rating_data.groupby('cusip')['rating_num'].shift(1)
-rating_data['rating_class_past'] = rating_data.groupby('cusip')['rating_class'].shift(1)
-rating_data['price_eom_past'] = rating_data.groupby('cusip')['price_eom'].shift(1)
+rating_data['rating_num_start'] = rating_data.groupby('cusip')['rating_num'].shift(1)
+rating_data['rating_class_start'] = rating_data.groupby('cusip')['rating_class'].shift(1)
+rating_data['price_eom_start'] = rating_data.groupby('cusip')['price_eom'].shift(1)
 # Merge the rating_data onto bond_data and bond_data_large
-bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_past', 'rating_class_past', 'price_eom_past']], on=['cusip', 'eom'], how='left')
+bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_start', 'rating_class_start', 'price_eom_start']], on=['cusip', 'eom'], how='left')
 
 #Adding credit spread from last period (large dataset)
 # Ensure data is sorted
@@ -149,18 +149,18 @@ bond_data_large["prior_date_cusip_shift"] = bond_data_large["current_date_cusip"
 # Create the dummy variable equal to 1 if the prior observations is from last month and on the same cusip
 bond_data_large["dummy_prior_match"] = (bond_data_large["prior_date_cusip_shift"] == bond_data_large["prior_date_cusip"]).astype(int)
 # Shift the 'credit_spread' column by 1 and store it in 'credit_spread_prior'
-bond_data_large['credit_spread_past'] = bond_data_large['credit_spread'].shift(1)
+bond_data_large['credit_spread_start'] = bond_data_large['credit_spread'].shift(1)
 # Remove observations where the prior observations was not the same cusip one month before
-bond_data_large.loc[bond_data_large['dummy_prior_match'] == 0, 'credit_spread_past'] = np.nan
+bond_data_large.loc[bond_data_large['dummy_prior_match'] == 0, 'credit_spread_start'] = np.nan
 # Drop help columns
 bond_data_large = bond_data_large.drop(columns=['dummy_prior_match', 'prior_date_cusip_shift', 'prior_date_cusip', 'current_date_cusip'])
 
 # Adding market value of last period
 bond_data_large = bond_data_large.sort_values(by=['cusip', 'eom'])
-bond_data_large['market_value_past'] = bond_data_large.groupby('cusip')['market_value'].shift(1)
-bond_data_large['market_value_past'] = bond_data_large['market_value_past'].fillna(bond_data_large['market_value'] / (1 + bond_data_large['ret']))
+bond_data_large['market_value_start'] = bond_data_large.groupby('cusip')['market_value'].shift(1)
+bond_data_large['market_value_start'] = bond_data_large['market_value_start'].fillna(bond_data_large['market_value'] / (1 + bond_data_large['ret']))
 
-# Remove observations with no rating / return / yield / amount outstanding
+# Remove observations with no rating / return / yield / amount outstanding / duration
 bond_data_large = bond_data_large.dropna(subset=['rating_num'])
 bond_data_large = bond_data_large.dropna(subset=['ret_exc'])
 bond_data_large = bond_data_large.dropna(subset=['yield'])
@@ -168,14 +168,14 @@ bond_data_large = bond_data_large.dropna(subset=['amount_outstanding'])
 bond_data_large = bond_data_large.dropna(subset=['duration'])
 
 #The first time a rating is observed, we assume it is the same as the rating of the next month
-bond_data_large['rating_num_past'] = bond_data_large['rating_num_past'].fillna(bond_data_large['rating_num'])
-bond_data_large['rating_class_past'] = bond_data_large['rating_class_past'].fillna(bond_data_large['rating_class'])
+bond_data_large['rating_num_start'] = bond_data_large['rating_num_start'].fillna(bond_data_large['rating_num'])
+bond_data_large['rating_class_start'] = bond_data_large['rating_class_start'].fillna(bond_data_large['rating_class'])
 
 # Adding definitions of distress
 bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 18.5
-bond_data_large['distressed_rating_past'] = bond_data_large['rating_num_past'] > 18.5
+bond_data_large['distressed_rating_start'] = bond_data_large['rating_num_start'] > 18.5
 bond_data_large['distressed_spread'] = bond_data_large['credit_spread'] > 0.1
-bond_data_large['distressed_spread_past'] = bond_data_large['credit_spread_past'] > 0.1
+bond_data_large['distressed_spread_start'] = bond_data_large['credit_spread_start'] > 0.1
 
 # Finalizing the bond_data dataset
 bond_data = bond_data_large[bond_data_large['eom'] <= '2021-11-30']
