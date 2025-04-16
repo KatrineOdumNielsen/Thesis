@@ -51,14 +51,15 @@ wrds_data.rename(columns={'offering_amt': 'size', 'date': 'eom', 'yield': 'wrds_
 wrds_data['eom'] = pd.to_datetime(wrds_data['eom'])
 wrds_data['wrds_yield'] = wrds_data['wrds_yield'].str.rstrip('%').astype(float) / 100
 wrds_data['ret_eom'] = wrds_data['ret_eom'].str.rstrip('%').astype(float) / 100
+wrds_data['maturity_years'] = (pd.to_datetime(wrds_data['maturity']) - pd.to_datetime(wrds_data['offering_date'])).dt.days / 365
 
 # Preparing merge of bond_return_data and descriptive data
 bond_return_data_subset = bond_return_data.drop(columns=['permno', 'rating_group', 'duration'])
 bond_descriptive_data = wrds_data[wrds_data['eom'] <= "2021-11-30"]
 columns_to_keep_descriptive = [
-    'eom', 'cusip', 'bond_type', 'size', 'amount_outstanding', 'coupon', 
+    'eom', 'cusip', 'security_level', 'size', 'amount_outstanding', 'coupon', 
     'rating_num', 'rating_cat', 'rating_class', 'wrds_yield', 'price_eom', 
-    'ret_eom', 'tmt', 'duration', 'offering_date'
+    'ret_eom', 'tmt', 'maturity_years', 'duration', 'offering_date'
 ]
 bond_descriptive_data_subset = bond_descriptive_data[columns_to_keep_descriptive]
 
@@ -133,6 +134,7 @@ rating_data = rating_data.sort_values(by=['cusip', 'eom'])
 rating_data['rating_num_start'] = rating_data.groupby('cusip')['rating_num'].shift(1)
 rating_data['rating_class_start'] = rating_data.groupby('cusip')['rating_class'].shift(1)
 rating_data['price_eom_start'] = rating_data.groupby('cusip')['price_eom'].shift(1)
+
 # Merge the rating_data onto bond_data and bond_data_large
 bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_start', 'rating_class_start', 'price_eom_start']], on=['cusip', 'eom'], how='left')
 
