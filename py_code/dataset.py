@@ -76,7 +76,7 @@ bond_additional_data_subset = bond_additional_data_subset.merge(
 bond_additional_data_subset.rename(columns={'1M': 't_bill_1m'}, inplace=True) # rename for clarity
 bond_additional_data_subset['yield'] = bond_additional_data_subset['wrds_yield']
 bond_additional_data_subset['ret'] = bond_additional_data_subset['ret_eom']
-bond_additional_data_subset['ret_exc'] = bond_additional_data_subset['ret'] - (1 + bond_additional_data_subset['t_bill_1m']) ** (1/12) - 1 # excess return
+bond_additional_data_subset['ret_exc'] = bond_additional_data_subset['ret'] - ((1 + bond_additional_data_subset['t_bill_1m']) ** (1/12) - 1) # excess return
 bond_additional_data_subset['ret_texc'] = bond_additional_data_subset['ret_exc'] # REQUIRED TO MERGE - IS NOT ACTUALLY CALCULATED CORRECTLY
 bond_additional_data_subset['market_value'] = bond_additional_data_subset['amount_outstanding'] * bond_additional_data_subset['price_eom'] * 10 # MV is NOT in '000s
 bond_additional_data_subset = bond_additional_data_subset[bond_data.columns]
@@ -186,4 +186,3 @@ bond_data = bond_data_large[bond_data_large['eom'] <= '2021-11-30']
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
 print("done")
-
