@@ -94,10 +94,10 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 
 ## =========== Our parameters ============= ##
 nu = 17 #changed
-σm = 0.08 #changed
+σm = 0.07 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (4, 0.5) #changed
+γ̂, b0 = (20, 2) #changed
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -122,6 +122,7 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 μ̂ = zeros(3,1)
 θ̂ᵢ = zeros(3,1)
 exp_exc_ret = zeros(3,1)
+alpha = zeros(3,1)
 
 
 ## list for bounds of integrals
@@ -344,7 +345,7 @@ for j = 1:3
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.04,μ̂[j],50)
+        μ_pot = LinRange(μ̂[j]-0.03,μ̂[j],30)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -457,5 +458,9 @@ for j = 1:3
     exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
     println("Done with portfolio $j")
 end
-println(exp_exc_ret)
+market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
+alpha = exp_exc_ret - βᵢ_all * market_return
+println("Expected excess return: $exp_exc_ret")
+println("Market return: $market_return")
+println("alpha: $alpha")
 println("Done with code")
