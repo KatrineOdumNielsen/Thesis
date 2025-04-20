@@ -97,7 +97,8 @@ nu = 17 #changed
 σm = 0.07 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (5, 1) #changed
+γ̂, b0 = (0.6, 0.6) #unchanged
+a = 1 #new parameter
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -283,7 +284,7 @@ for j = 1:3
 
     # Solve Equation 35 and get μ̂
     function Equation35(mu)
-        term1 = (mu[1] + (nu * zetai / (nu-2) - Rf)) - γ̂ * βᵢ * σm ^ 2
+        term1 = a * ((mu[1] + (nu * zetai / (nu-2) - Rf)) - γ̂ * βᵢ * σm ^ 2)
         term2 = -α * lamb * b0 * neg_integral(mu[1], Si, zetai, g_i,theta_mi,theta_i_minus1)
         term3 = - α * b0 * pos_integral(mu[1], Si, zetai, g_i,theta_mi,theta_i_minus1)
         return term1 + term2 + term3
@@ -293,7 +294,7 @@ for j = 1:3
     # Equation 20
     function Equation20(θᵢ,μ̂)
 
-        term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        term1 = a * (θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2)))
         term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
         term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
@@ -318,7 +319,7 @@ for j = 1:3
         ### Draw Figure 3 for portfolio j ###
         function Equation20(θᵢ,μ̂)
 
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+            term1 = a * (θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2)))
             term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
             term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
@@ -326,17 +327,18 @@ for j = 1:3
         end
         
         #θᵢ_rand = LinRange(0.00001,0.002,50)
-        θᵢ_rand = LinRange(0.0001,0.02,100)
+        θᵢ_rand = LinRange(0.00001,0.005,100)
         u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
         #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-        θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+        θᵢ_rand_neg = LinRange(-0.0025,-0.00001,100)
         u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
         θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
         u_rand_all = [u_rand_neg; u_rand]
 
-        utility[j] = Equation20(θ̂ᵢ[j],μ̂[j])
+        # Store utility values
+        utility[j] = Equation20(θ̂ᵢ[j],μ̂[j])  * -1
         theta_low[j] = θ̂ᵢ[j]
 
         #   Plot graphs
@@ -348,20 +350,21 @@ for j = 1:3
         xlabel!("θ₁", xguidefontsize=10)
         ylabel!("utility", yguidefontsize=10)
         title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures","Figure3_portfolio_$(j)_testingb0.png"))
+        savefig(joinpath("figures","Figure3_with_a,_portfolio$(j).png"))
 
         println("done with fig 3")
 
-        function Equation20_MV(θᵢ,μ̂)
 
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        function Equation20_MV_homogeneous(θᵢ,μ̂)
+
+            term1 = a * (θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2)))
             # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
             # term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
             return -(term1)
         end
 
-        function Equation20_PT(θᵢ,μ̂)
+        function Equation20_PT_homogeneous(θᵢ,μ̂)
 
             # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
             term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
@@ -369,13 +372,13 @@ for j = 1:3
 
             return -(term2 + term3)
         end
-        utility_pt_low[j] = Equation20_PT(θ̂ᵢ[j],μ̂[j])
-        utility_mv_low[j] = Equation20_MV(θ̂ᵢ[j],μ̂[j])
+        utility_pt_low[j] = Equation20_PT_homogeneous(θ̂ᵢ[j],μ̂[j]) * (-1)
+        utility_mv_low[j] = Equation20_MV_homogeneous(θ̂ᵢ[j],μ̂[j]) * (-1)
 
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.025,μ̂[j],30)
+        μ_pot = LinRange(μ̂[j]-0.01,μ̂[j],100)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -395,8 +398,8 @@ for j = 1:3
                 opt_theta_high = Optim.minimizer(result_high)[1]  # Extract the optimal theta for the high range
             
                 # Calculate utilities
-                utility_low = Equation20(opt_theta_low, μ_pot_i)  # Utility for opt_theta_low
-                utility_high = Equation20(opt_theta_high, μ_pot_i)  # Utility for opt_theta_high
+                utility_low = Equation20(opt_theta_low, μ_pot_i) * -1  # Utility for opt_theta_low
+                utility_high = Equation20(opt_theta_high, μ_pot_i) * -1  # Utility for opt_theta_high
             
                 # Calculate the difference between the two utilities
                 utility_diff = abs(utility_low - utility_high)
@@ -419,8 +422,9 @@ for j = 1:3
         μ̂[j] = optimal_mu
 
         # Print the updated μ̂[j]
-        println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])        
-        
+        println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])
+
+                
         # Calculate utility
         # Extract the corresponding utility_low value
         optimal_utility_low = results_df[index_of_min_u_diff, :utility_low]
@@ -444,7 +448,7 @@ for j = 1:3
         ### Draw Figure 4 for portfolio j ###
         function Equation20(θᵢ,μ̂)
 
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+            term1 = a * (θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2)))
             term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
             term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
@@ -453,7 +457,7 @@ for j = 1:3
 
         function Equation20_MV(θᵢ,μ̂)
 
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+            term1 = a * (θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2)))
             # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
             # term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
@@ -469,14 +473,14 @@ for j = 1:3
             return -(term2 + term3)
         end
         
-        hetro_mu = μ̂[j] #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
+        hetro_mu = μ̂[j]
 
-        θᵢ_rand = LinRange(0.0001,1.25,100)
+        θᵢ_rand = LinRange(0.0005,0.4,100)
         u_rand = Equation20.(θᵢ_rand,hetro_mu)
         MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
         PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
 
-        θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+        θᵢ_rand_neg = LinRange(-0.1,-0.001,50)
         u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
         MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
         PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
@@ -491,57 +495,54 @@ for j = 1:3
         # Plots.GRBackend()
         pyplot()
         Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,1.25), ylims=(-0.003,0.003) ,color=:red, leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.5), ylims=(-0.003,0.003) ,leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.5), ylims=(-0.003,0.003) ,leg = false, dpi=300)
+        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,color=:red, leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
         xlabel!("θ₁", xguidefontsize=10)
         ylabel!("utility", yguidefontsize=10)
         title!("Objective function for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures", "Figure4_portfolio_$(j)_testingb0.png"))
+        savefig(joinpath("figures", "Figure4_with_a,_portfolio_$(j).png"))
 
-        function Equation20_MV(θᵢ,μ̂)
-
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-            # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-            # term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-
-            return -(term1)
-        end
-
-        function Equation20_PT(θᵢ,μ̂)
-
-            # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-            term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-            term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-
-            return -(term2 + term3)
-        end
-        utility_pt_low[j] = Equation20_PT(theta_low[j],μ̂[j])
-        utility_mv_low[j] = Equation20_MV(theta_low[j],μ̂[j])
-        utility_pt_high[j] = Equation20_PT(theta_high[j],μ̂[j])
-        utility_mv_high[j] = Equation20_MV(theta_high[j],μ̂[j])
+        utility_pt_low[j] = Equation20_PT(theta_low[j],μ̂[j]) * -1
+        utility_mv_low[j] = Equation20_MV(theta_low[j],μ̂[j]) * -1
+        utility_pt_high[j] = Equation20_PT(theta_high[j],μ̂[j]) * -1
+        utility_mv_high[j] = Equation20_MV(theta_high[j],μ̂[j]) * -1
 
     end
     exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
     println("Done with portfolio $j")
 end
 
-utility_total = utility[1] * 30 + utility[2] * 190 + utility[3] * 780
+#Utilities and alphas:
+utility_total = utility[1] * 100 + utility[2] * 100 + utility[3] * 100
 
-utility_pt = utility_pt_low[1] * 30 * x[j] + utility_pt_high[1] * 30 * y[j] +
-              utility_pt_low[2] * 190 * x[j] + utility_pt_high[2] * 190 * y[j] +
-              utility_pt_low[3] * 780 * x[j] + utility_pt_high[3] * 780 * y[j]
+utility_pt = utility_pt_low[1] * 100 * x[1] + utility_pt_high[1] * 100 * y[1] +
+              utility_pt_low[2] * 100 * x[2] + utility_pt_high[2] * 100 * y[2] +
+              utility_pt_low[3] * 100 * x[3] + utility_pt_high[3] * 100 * y[3]
 
-utility_mv = utility_mv_low[1] * 30 * x[j] + utility_mv_high[1] * 30 * y[j] +
-              utility_mv_low[2] * 190 * x[j] + utility_mv_high[2] * 190 * y[j] +
-              utility_mv_low[3] * 780 * x[j] + utility_mv_high[3] * 780 * y[j]
+utility_mv = utility_mv_low[1] * 100 * x[1] + utility_mv_high[1] * 100 * y[1] +
+              utility_mv_low[2] * 100 * x[2] + utility_mv_high[2] * 100 * y[2] +
+              utility_mv_low[3] * 100 * x[3] + utility_mv_high[3] * 100 * y[3]
 
-market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
+market_return = theta_mi_all[1] * 100 * exp_exc_ret[1] + theta_mi_all[2] * 100 * exp_exc_ret[2] + theta_mi_all[3] * 100 * exp_exc_ret[3]
+
 alpha = exp_exc_ret - βᵢ_all * market_return
+
+pt_total_share = utility_pt / utility_total
+
+
+println("Utility from each asset: $utility")
+println("Low holding of each asset: $theta_low")
+println("High holding of each asset: $theta_high")
+println("Fraction of investors with low holding: $x")
+println("Fraction of investors with high holding: $y")
+println("Utilty from low holding: $utility_pt_low")
+println("Utilty from high holding: $utility_pt_high")
 println("Utility total: $utility_total")
 println("Utility from prospect theory: $utility_pt")
 println("Utility from mean-variance: $utility_mv")
 println("Expected excess return: $exp_exc_ret")
 println("Market return: $market_return")
 println("alpha: $alpha")
+println("Share of utility from PT: $pt_total_share")
 println("Done with code")
