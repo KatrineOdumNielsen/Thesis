@@ -97,8 +97,8 @@ nu = 17 #changed
 σm = 0.07 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (0.6, 0.6) #unchanged
-a = 1 #new parameter
+γ̂, b0 = (2, 0.6) #unchanged
+a = 5 #new parameter
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -327,11 +327,11 @@ for j = 1:3
         end
         
         #θᵢ_rand = LinRange(0.00001,0.002,50)
-        θᵢ_rand = LinRange(0.00001,0.005,100)
+        θᵢ_rand = LinRange(0.000001,0.001,100)
         u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
         #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-        θᵢ_rand_neg = LinRange(-0.0025,-0.00001,100)
+        θᵢ_rand_neg = LinRange(-0.0005,-0.000001,100)
         u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
         θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
@@ -378,7 +378,7 @@ for j = 1:3
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.01,μ̂[j],100)
+        μ_pot = LinRange(μ̂[j]-0.0075,μ̂[j]-0.0025,100)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -475,12 +475,12 @@ for j = 1:3
         
         hetro_mu = μ̂[j]
 
-        θᵢ_rand = LinRange(0.0005,0.4,100)
+        θᵢ_rand = LinRange(0.000001,0.3,100)
         u_rand = Equation20.(θᵢ_rand,hetro_mu)
         MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
         PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
 
-        θᵢ_rand_neg = LinRange(-0.1,-0.001,50)
+        θᵢ_rand_neg = LinRange(-0.03,-0.0001,50)
         u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
         MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
         PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
@@ -495,9 +495,9 @@ for j = 1:3
         # Plots.GRBackend()
         pyplot()
         Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,color=:red, leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
+        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.03,0.25), ylims=(-0.003,0.003) ,color=:red, leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.03,0.25), ylims=(-0.003,0.003) ,leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.03,0.25), ylims=(-0.003,0.003) ,leg = false, dpi=300)
         xlabel!("θ₁", xguidefontsize=10)
         ylabel!("utility", yguidefontsize=10)
         title!("Objective function for portfolio $(j)", titlefontsize=10)
@@ -530,7 +530,7 @@ alpha = exp_exc_ret - βᵢ_all * market_return
 
 pt_total_share = utility_pt / utility_total
 
-
+println("μ̂: $μ̂")
 println("Utility from each asset: $utility")
 println("Low holding of each asset: $theta_low")
 println("High holding of each asset: $theta_high")
