@@ -94,7 +94,7 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 
 ## =========== Our parameters ============= ##
 nu = 17 #changed
-σm = 0.08 #changed
+σm = 0.07 #changed
 Rf = 1 #unchanged
 
 γ̂, b0 = (4, 0.5) #unchanged
@@ -124,7 +124,7 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 exp_exc_ret = zeros(3,1)
 
 ## list for bounds of integrals
-bound = [20,20,20]
+bound = [18,8,8]
 
 for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
@@ -303,41 +303,41 @@ for j = 1:3
 
     if abs(θ̂ᵢ[j] - theta_mi) < 0.00001
         println("$j is a homogeneous equilibrium")
-        println("Drawing figure 3 for portfolio $j")
+        # println("Drawing figure 3 for portfolio $j")
 
-        ### Draw Figure 3 for portfolio j ###
-        function Equation20(θᵢ,μ̂)
+        # ### Draw Figure 3 for portfolio j ###
+        # function Equation20(θᵢ,μ̂)
 
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-            term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-            term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        #     term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
+        #     term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        #     term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
 
-            return -(term1 + term2 + term3)
-        end
+        #     return -(term1 + term2 + term3)
+        # end
         
-        #θᵢ_rand = LinRange(0.00001,0.002,50)
-        θᵢ_rand = LinRange(0.0001,0.02,100)
-        u_rand = Equation20.(θᵢ_rand,μ̂[j])
+        # #θᵢ_rand = LinRange(0.00001,0.002,50)
+        # θᵢ_rand = LinRange(0.0001,0.02,100)
+        # u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
-        #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-        θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
-        u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
+        # #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
+        # θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
+        # u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
-        θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-        u_rand_all = [u_rand_neg; u_rand]
+        # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+        # u_rand_all = [u_rand_neg; u_rand]
 
         #   Plot graphs
         # gr()
         # Plots.GRBackend()
-        pyplot()
-        Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
-        xlabel!("θ₁", xguidefontsize=10)
-        ylabel!("utility", yguidefontsize=10)
-        title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures","Figure3_portfolio_$(j).png"))
+        # pyplot()
+        # Plots.PyPlotBackend()
+        # plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
+        # xlabel!("θ₁", xguidefontsize=10)
+        # ylabel!("utility", yguidefontsize=10)
+        # title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
+        # savefig(joinpath("figures","Figure3_portfolio_$(j).png"))
 
-        println("done with fig 3")
+        # println("done with fig 3")
 
 
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
@@ -442,19 +442,23 @@ for j = 1:3
         #   Plot graphs
         # gr()
         # Plots.GRBackend()
-        pyplot()
-        Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,leg = false, dpi=300)
-        xlabel!("θ₁", xguidefontsize=10)
-        ylabel!("utility", yguidefontsize=10)
-        title!("Objective function for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
+        # pyplot()
+        # Plots.PyPlotBackend()
+        # plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,color=:red, leg = false, dpi=300)
+        # plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+        # plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.75), ylims=(-0.004,0.004) ,leg = false, dpi=300)
+        # xlabel!("θ₁", xguidefontsize=10)
+        # ylabel!("utility", yguidefontsize=10)
+        # title!("Objective function for portfolio $(j)", titlefontsize=10)
+        # savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
 
     end
     exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
     println("Done with portfolio $j")
 end
 println(exp_exc_ret)
+
+market_return = exp_exc_ret[1]*30*0.00027080114067964175  + exp_exc_ret[2]*190*0.0006408868164037302 + exp_exc_ret[3]*780*0.001115522398285772
+println("Market return is ", market_return)
+
 println("Done with code")

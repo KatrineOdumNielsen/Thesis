@@ -40,7 +40,8 @@ model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller datafr
 
 #Load descriptive statistics
 print("Descriptive statistics:")
-summary_stats = bond_data.describe(include='all')
+descriptive_variables = ['size', 'ret', 'duration', 'market_value_start', 'maturity_years','credit_spread_start', 'rating_num_start']
+summary_stats = bond_data[descriptive_variables].describe(include='all')
 summary_stats.to_csv("data/other/summary_statistics.csv")
 model_stats = model_data.describe(include='all')
 model_stats.to_csv("data/other/model_summary_statistics.csv")
@@ -51,34 +52,17 @@ unique_sizes = grouped['size'].first()
 average_bond_size = unique_sizes.mean()
 print("Average bond size (initial offering value):", average_bond_size)
 
-# Average values of variables at two data points (midway and end)
-earliest_date = pd.to_datetime('2002-07-31')
-last_date = bond_data['eom'].max()
-midway_date = earliest_date + (last_date - earliest_date) / 2
+# Proportion senior vs subordinated
+proportions = bond_data['security_level'].value_counts(normalize=True)
+print(proportions)
 
-midway = pd.to_datetime('2012-03-31')
-enddate = pd.to_datetime('2021-11-30')
-
-# Filter rows for each snapshot
-snapshot_2013 = bond_data[bond_data['eom'] == midway]
-snapshot_2023 = bond_data[bond_data['eom'] == enddate]
-
-# List the columns you want to average
-cols_to_average = ['duration', 'yield', 'market_value', 'ret_exc', 
-                   'ret_texc', 'rating_num']
-
-# Compute the averages at each snapshot
-snapshot_2002_avg = snapshot_2013[cols_to_average].mean(numeric_only=True)
-snapshot_2023_avg = snapshot_2023[cols_to_average].mean(numeric_only=True)
-
-print("Averages at 2002-07-31:")
-print(snapshot_2002_avg)
-print("\nAverages at 2023-12-31:")
-print(snapshot_2023_avg)
+# Listing the columns to average
+cols_to_average = ['duration', 'yield', 'market_value_start', 'ret', 
+                   'credit_spread_start', 'rating_num_start']
 
 # Compute the 1st (Q1) and 3rd (Q3) quartiles and the IQR
-Q1 = bond_data['ret_exc'].quantile(0.25)
-Q3 = bond_data['ret_exc'].quantile(0.75)
+Q1 = bond_data['ret'].quantile(0.25)
+Q3 = bond_data['ret'].quantile(0.75)
 IQR = Q3 - Q1
 
 # Define lower and upper bounds for outliers
@@ -87,10 +71,10 @@ upper_bound = Q3 + 1.5 * IQR
 
 # Identify outliers
 outliers_iqr = bond_data[(bond_data['ret_exc'] < lower_bound) | (bond_data['ret_exc'] > upper_bound)]
-print("Number of outliers using IQR method:", len(outliers_iqr))
-print("Outliers (IQR method):")
-print(outliers_iqr)
-print(outliers_iqr.describe())
+# print("Number of outliers using IQR method:", len(outliers_iqr))
+# print("Outliers (IQR method):")
+# print(outliers_iqr)
+# print(outliers_iqr.describe())
 outliers_iqr.to_csv("data/other/outliers_iqr.csv")
 
 # ---------------------------------------------------
@@ -101,24 +85,17 @@ time_series_avg = bond_data.groupby('eom')[cols_to_average].mean(numeric_only=Tr
 
 # Reset the index if you want 'eom' as a column
 time_series_avg = time_series_avg.reset_index()
-
-# Optionally, print or plot the time series
-print("\nTime series of average values (first 5 rows):")
-print(time_series_avg.head())
-
-# If you want to plot one variable (e.g., average duration) over time:
-# Assuming time_series_avg is your DataFrame with an 'eom' column and the variables in cols_to_average
-variables = ['duration', 'yield', 'market_value', 'ret_exc', 'ret_texc', 'rating_num']
+variables = ['duration', 'yield', 'ret', 'market_value_start', 'credit_spread_start', 'rating_num_start']
 
 # Create a 2x3 grid of subplots
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 10), sharex=True)
 axes = axes.flatten()  # flatten to easily iterate over axes
 
 for i, var in enumerate(variables):
-    axes[i].plot(time_series_avg['eom'], time_series_avg[var], linestyle='-', color='blue')  
-    axes[i].set_title(f'Average {var.capitalize()} Over Time')
+    axes[i].plot(time_series_avg['eom'], time_series_avg[var], linestyle='-', color='cornflowerblue')  
+    axes[i].set_title(f'Average {var} over time')
     axes[i].set_xlabel('Date')
-    axes[i].set_ylabel(var.capitalize())
+    axes[i].set_ylabel(var)
     axes[i].tick_params(axis='x', rotation=45)
 
 plt.tight_layout()
@@ -136,9 +113,9 @@ DI = bond_data[bond_data['credit_spread'] > 0.1]
 
 
 # descriptive statistics for each group
-IG_stats = IG.describe()
-HY_stats = HY.describe()
-DI_stats = DI.describe()
+IG_stats = IG[descriptive_variables].describe()
+HY_stats = HY[descriptive_variables].describe()
+DI_stats = DI[descriptive_variables].describe()
 IG_stats.to_csv("data/other/IG_summary_statistics.csv")
 HY_stats.to_csv("data/other/HY_summary_statistics.csv")
 DI_stats.to_csv("data/other/DI_summary_statistics.csv")
@@ -430,11 +407,11 @@ cum_df = cumulative_df.reset_index()
 cum_df = cum_df.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
 monthly_df = monthly_df.reset_index().rename(columns={"index": "date"})
 cum_df = cum_df.reset_index().rename(columns={"index": "date"})
-combined_df_large = pd.merge(monthly_df, cum_df, on='date')
+combined_df_2004 = pd.merge(monthly_df, cum_df, on='date')
 
 # 4. Save Combined DataFrame to CSV
 output_path = os.path.join(data_folder, "preprocessed", "market_returns_combined.csv") 
-combined_df_large.to_csv(output_path, index=False) 
+combined_df_2004.to_csv(output_path, index=False) 
 print("Combined monthly and cumulative returns saved to:", output_path)
 
 cum_df['date'] = pd.to_datetime(cum_df['date'])
