@@ -10,42 +10,44 @@
 #
 #
 # ======================================================================================================================
-# Change to your project directory
-Project_folder = os.getcwd()
-# result_folder = Project_folder * "/result"
+ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
+ENV["SSL_CERT_FILE"] = ""
 
-cd(Project_folder * "/_temp")
+# Get the current working directory in Julia
+project_folder = pwd()
+cd(joinpath(project_folder))
 
-using Pkg
-# Pkg.activate(joinpath(pwd(),".."))
-Pkg.activate(joinpath(pwd(),"code"))
+using Pkg, Base.Filesystem
+#Pkg.activate(joinpath(pwd(),""))
+#Pkg.instantiate()
 
-
-# Pkg.add("Statistics")
-# Pkg.add("Distributions")
-# Pkg.add("LinearAlgebra")
-# Pkg.add("Plots")
-# Pkg.add("Parameters")
-# Pkg.add("PrettyTables")
-# Pkg.add("StatsPlots")
-# Pkg.add("SpecialFunctions")
-# Pkg.add("Optim")
-# Pkg.add("QuadGK")
-# Pkg.add("NLsolve")
-# Pkg.add("ForwardDiff")
-# Pkg.add("CSV")
-# Pkg.add("DataFrames")
-# Pkg.add("BlackBoxOptim")
-# Pkg.add("JuMP")
-# Pkg.add("Ipopt")
-# Pkg.add("GLPK")
-# Pkg.add(url="https://github.com/JuliaMPC/NLOptControl.jl")
-# Pkg.add("GR")
-# Pkg.add("PGFPlotsX")
-# Pkg.add("PlotlyJS")
-# Pkg.add("ORCA")
-# Pkg.add("PyPlot")
-# Pkg.add("PlotThemes")
+#Pkg.add(url="https://github.com/JuliaMPC/NLOptControl.jl")
+#Pkg.add(PackageSpec(name="KNITRO", version="0.5.0"))
+#Pkg.pin("KNITRO")  # This pins the currently resolved version
+#Pkg.add("Statistics")
+#Pkg.add("Distributions")
+#Pkg.add("LinearAlgebra")
+#Pkg.add("Parameters")
+#Pkg.add("PrettyTables")
+#Pkg.add("StatsPlots")
+#Pkg.add("SpecialFunctions")
+#Pkg.add("Optim")
+#Pkg.add("QuadGK")
+#Pkg.add("NLsolve")
+#Pkg.add("ForwardDiff")
+#Pkg.add("CSV")
+#Pkg.add("DataFrames")
+#Pkg.add("BlackBoxOptim")
+#Pkg.add("JuMP")
+#Pkg.add("Ipopt")
+#Pkg.add("GLPK")
+#Pkg.add("GR")
+#Pkg.add("PGFPlotsX")
+#Pkg.add("PlotlyJS")
+#Pkg.add("ORCA")
+#Pkg.add("PyPlot")
+#Pkg.add("PlotThemes")
+#Pkg.add("DocStringExtensions")
 
 using LinearAlgebra, Random, Distributions, Plots, Parameters, PrettyTables, Printf
 using Optim
@@ -59,17 +61,23 @@ using ForwardDiff
 using Optim: converged, maximum, maximizer, minimizer, iterations #some extra functions
 using CSV
 using DataFrames
-# using BlackBoxOptim
+using BlackBoxOptim
 using JuMP, Ipopt
 using GLPK
 Plots.showtheme(:vibrant)
 theme(:bright)
 
+# #%% Import parameters generated from python part 3a
+# momr_avg_theta_all = DataFrame(CSV.File(project_folder * "/data/momr_avg_theta_all.csv"))
+# momr_beta = DataFrame(CSV.File(project_folder * "/data/momr_avg_beta_all.csv"))
+# momr_gi = DataFrame(CSV.File(project_folder * "/data/momr_avg_g_i_all.csv"))
+# momr_std_skew = DataFrame(CSV.File(project_folder * "/data/momr_avg_std_skew_Si_xi_all.csv"))
+
 #%% Import parameters generated from python part 3a
-momr_avg_theta_all = DataFrame(CSV.File(Project_folder * "/data/momr_avg_theta_all.csv"))
-momr_beta = DataFrame(CSV.File(Project_folder * "/data/momr_avg_beta_all.csv"))
-momr_gi = DataFrame(CSV.File(Project_folder * "/data/momr_avg_g_i_all.csv"))
-momr_std_skew = DataFrame(CSV.File(Project_folder * "/data/momr_avg_std_skew_Si_xi_all.csv"))
+momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
+momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
+momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
+momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
 
 #%% Merge tables
 momr_std_skew = select!(momr_std_skew, Not(:Column1))
@@ -97,7 +105,7 @@ momr_param_all = leftjoin(momr_std_skew,momr_gi, on=["momr"])
 # Plots.GRBackend()
 pyplot()
 Plots.PyPlotBackend()
-plot(momr_param_all.avg_std, momr_param_all.avg_skew, markersize=20, xlims=(0.2,1.2), ylims=(1.8,4.0), framestyle=:box, linetype=:scatter ,markershape=:star5, markersize=10,leg = false, dpi=300)
+plot(momr_param_all.avg_std, momr_param_all.avg_skew, xlims=(0.2,1.2), ylims=(1.8,4.0), framestyle=:box, linetype=:scatter ,markershape=:star5, markersize=10,leg = false, dpi=300)
 xlabel!("standard deviation", xguidefontsize=18)
 ylabel!("skewness", yguidefontsize=18)
 savefig("Figure2a.png")
