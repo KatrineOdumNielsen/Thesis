@@ -131,8 +131,8 @@ utility_pt_low = zeros(3,1)
 utility_mv_low = zeros(3,1)
 theta_high = zeros(3,1)
 theta_low = zeros(3,1)
-x = ones(3,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
-y = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
+l = ones(3,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
+h = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
 bound = [20,20,15]
@@ -437,8 +437,8 @@ for j = 1:3
         theta_low[j] = optimal_theta_low
         optimal_theta_high = results_df[index_of_min_u_diff, :opt_theta_high]
         theta_high[j] = optimal_theta_high
-        x[j] = 1 - (theta_mi - theta_low[j]) / (theta_high[j] - theta_low[j])
-        y[j] = (theta_mi - theta_low[j]) / (theta_high[j] - theta_low[j])
+        l[j] = 1 - (theta_mi - theta_low[j]) / (theta_high[j] - theta_low[j])
+        h[j] = (theta_mi - theta_low[j]) / (theta_high[j] - theta_low[j])
 
         # Print the row with the lowest u_diff
         println("Row with the lowest u_diff:")
@@ -475,7 +475,7 @@ for j = 1:3
         
         hetro_mu = μ̂[j]
 
-        θᵢ_rand = LinRange(0.000001,0.3,100)
+        θᵢ_rand = LinRange(0.000005,0.3,100)
         u_rand = Equation20.(θᵢ_rand,hetro_mu)
         MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
         PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
@@ -516,13 +516,13 @@ end
 #Utilities and alphas:
 utility_total = utility[1] * 100 + utility[2] * 100 + utility[3] * 100
 
-utility_pt = utility_pt_low[1] * 100 * x[1] + utility_pt_high[1] * 100 * y[1] +
-              utility_pt_low[2] * 100 * x[2] + utility_pt_high[2] * 100 * y[2] +
-              utility_pt_low[3] * 100 * x[3] + utility_pt_high[3] * 100 * y[3]
+utility_pt = utility_pt_low[1] * 100 * l[1] + utility_pt_high[1] * 100 * h[1] +
+              utility_pt_low[2] * 100 * l[2] + utility_pt_high[2] * 100 * h[2] +
+              utility_pt_low[3] * 100 * l[3] + utility_pt_high[3] * 100 * h[3]
 
-utility_mv = utility_mv_low[1] * 100 * x[1] + utility_mv_high[1] * 100 * y[1] +
-              utility_mv_low[2] * 100 * x[2] + utility_mv_high[2] * 100 * y[2] +
-              utility_mv_low[3] * 100 * x[3] + utility_mv_high[3] * 100 * y[3]
+utility_mv = utility_mv_low[1] * 100 * l[1] + utility_mv_high[1] * 100 * h[1] +
+              utility_mv_low[2] * 100 * l[2] + utility_mv_high[2] * 100 * h[2] +
+              utility_mv_low[3] * 100 * l[3] + utility_mv_high[3] * 100 * h[3]
 
 market_return = theta_mi_all[1] * 100 * exp_exc_ret[1] + theta_mi_all[2] * 100 * exp_exc_ret[2] + theta_mi_all[3] * 100 * exp_exc_ret[3]
 
