@@ -92,14 +92,14 @@ pyplot()
 Plots.PyPlotBackend()
 labels = ["DI", "HY", "IG"]
 plot(average_metrics_updated.volatility, average_metrics_updated.skewness, marker_z   = 1:3, 
-    colormap=:blues, framestyle=:box, xlims=(0,0.5), ylims=(0,1),linetype=:scatter ,
+    colormap=:blues, framestyle=:box, xlims=(0,0.4), ylims=(0,0.9),linetype=:scatter ,
     markershape=:octagon, markersize=11,leg = false, dpi=300)
-xlabel!("standard deviation", xguidefontsize=10)
-ylabel!("skewness", yguidefontsize=10)
+xlabel!("standard deviation", xguidefontsize=12)
+ylabel!("skewness", yguidefontsize=12)
 for (xi, yi, lab) in zip(x, y, labels)
     annotate!(
       xi, yi + 0.05,                    # shift label 0.02 up
-      text(lab, 8, halign = :center)    # font size 8, centered
+      text(lab, 10, halign = :center)    # font size 8, centered
     )
 end
 savefig(joinpath("figures", "Figure2a.png"))
@@ -109,17 +109,17 @@ pyplot()
 Plots.PyPlotBackend()
 labels = ["DI", "HY", "IG"]
 plot(average_metrics_updated.volatility, average_metrics_updated.cap_gain_overhang, marker_z   = 1:3, 
-    colormap=:blues, framestyle=:box, xlims=(0,0.5), ylims=(-20,5), linetype=:scatter ,
-    markershape=:octagon, markersize=11,leg = false, dpi=300)
-xlabel!("standard deviation", xguidefontsize=10)
-ylabel!("gain overhang", yguidefontsize=10)
+    colormap=:blues, framestyle=:box, xlims=(0,0.4), ylims=(-20,5), linetype=:scatter ,
+    markershape=:octagon, markersize=12,leg = false, dpi=300)
+xlabel!("standard deviation", xguidefontsize=12)
+ylabel!("gain overhang", yguidefontsize=12)
 for (xi, yi, lab) in zip(
     average_metrics_updated.volatility,
     average_metrics_updated.cap_gain_overhang,
     labels,)
   annotate!(
     xi, yi + 1,
-    text(lab, 8, halign = :center))
+    text(lab, 10, halign = :center))
 end
 savefig(joinpath("figures", "Figure2b.png"))
 
@@ -127,10 +127,10 @@ pyplot()
 Plots.PyPlotBackend()
 labels = ["DI", "HY", "IG"]
 plot(average_metrics_updated.skewness, average_metrics_updated.cap_gain_overhang, marker_z   = 1:3, 
-    colormap=:blues, framestyle=:box, xlims=(0,1), ylims=(-20,5),linetype=:scatter ,
-    markershape=:octagon, markersize=11,leg = false, dpi=300)
-xlabel!("skewness", xguidefontsize=10)
-ylabel!("gain overhang", yguidefontsize=10)
+    colormap=:blues, framestyle=:box, xlims=(0,0.9), ylims=(-20,5),linetype=:scatter ,
+    markershape=:octagon, markersize=12,leg = false, dpi=300)
+xlabel!("skewness", xguidefontsize=12)
+ylabel!("gain overhang", yguidefontsize=12)
 for (xi, yi, lab) in zip(
     average_metrics_updated.skewness,
     average_metrics_updated.cap_gain_overhang,
@@ -138,7 +138,7 @@ for (xi, yi, lab) in zip(
   )
   annotate!(
     xi, yi + 1,
-    text(lab, 8, halign = :center)
+    text(lab, 10, halign = :center)
   )
 end
 savefig(joinpath("figures", "Figure2c.png"))
