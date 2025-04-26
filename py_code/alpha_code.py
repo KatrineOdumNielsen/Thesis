@@ -116,7 +116,6 @@ long_term_gvt_bond_data = long_term_gvt_bond_data.loc[
 long_term_gvt_bond_data = long_term_gvt_bond_data.set_index('date')
 
 # Pull T-bill rate (1-month) from FRED and resample to monthly
-t1m_daily = fred.get_series('DGS1MO') / 100  # Convert from % to decimal
 t1m_daily = t1m_daily.ffill()  # Forward fill missing values
 
 # Resample to month-end

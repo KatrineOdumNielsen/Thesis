@@ -29,7 +29,8 @@ model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 
 #================================== TEST - MAYBE REMOVE============================================
-model_data['ret_exc'] = model_data['ret']
+model_data['ret_exc'] = model_data['ret_texc']
+bond_data['ret_exc'] = bond_data['ret_texc']
 # ===================================================================    
 #                     a. Set up portfolios by month        
 # ===================================================================
@@ -380,81 +381,81 @@ median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overha
 print("Median metrics per bond portfolio:")
 print(median_metrics)
 
-# =============================================================================
-#               i. Checking the accuracy of the CGO calculations 
-# =============================================================================
+# # =============================================================================
+# #               i. Checking the accuracy of the CGO calculations 
+# # =============================================================================
 
-# -------------------------------
-# 1. Descriptive Statistics
-# -------------------------------
-# print("Summary Statistics for Capital Gain Overhang:")
-# print(model_data['cap_gain_overhang'].describe())
-# print("Median Capital Gain Overhang:", model_data['cap_gain_overhang'].median())
+# # -------------------------------
+# # 1. Descriptive Statistics
+# # -------------------------------
+# # print("Summary Statistics for Capital Gain Overhang:")
+# # print(model_data['cap_gain_overhang'].describe())
+# # print("Median Capital Gain Overhang:", model_data['cap_gain_overhang'].median())
 
-# -------------------------------
-# 2. Distribution Visualization
-# -------------------------------
-cmap = cm.get_cmap('GnBu', 5).reversed()
-model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
-model_data_cgo['eom'] = pd.to_datetime(model_data_cgo['eom'])
+# # -------------------------------
+# # 2. Distribution Visualization
+# # -------------------------------
+# cmap = cm.get_cmap('GnBu', 5).reversed()
+# model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
+# model_data_cgo['eom'] = pd.to_datetime(model_data_cgo['eom'])
 
-# Histogram with KDE to inspect the overall distribution
-plt.figure(figsize=(10, 6))
-# We can pick a single color from the colormap, e.g. cmap(1)
-sns.histplot(
-    model_data_cgo['cap_gain_overhang'].dropna(),
-    bins=50,
-    kde=True,
-    color=cmap(1)  # Using one color from the reversed colormap
-)
-plt.xlabel('Capital Gain Overhang (%)')
-plt.title('Distribution of Capital Gain Overhang (using price_eom_start)')
-plt.tight_layout()
-plt.savefig(os.path.join(figures_folder, "cgo_distribution.png"))
-plt.close()
+# # Histogram with KDE to inspect the overall distribution
+# plt.figure(figsize=(10, 6))
+# # We can pick a single color from the colormap, e.g. cmap(1)
+# sns.histplot(
+#     model_data_cgo['cap_gain_overhang'].dropna(),
+#     bins=50,
+#     kde=True,
+#     color=cmap(1)  # Using one color from the reversed colormap
+# )
+# plt.xlabel('Capital Gain Overhang (%)')
+# plt.title('Distribution of Capital Gain Overhang (using price_eom_start)')
+# plt.tight_layout()
+# plt.savefig(os.path.join(figures_folder, "cgo_distribution.png"))
+# plt.close()
 
-# Boxplot by Portfolio to see differences across portfolios
-unique_portfolios = sorted(model_data_cgo['portfolio'].dropna().unique())
-palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+# # Boxplot by Portfolio to see differences across portfolios
+# unique_portfolios = sorted(model_data_cgo['portfolio'].dropna().unique())
+# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
 
-plt.figure(figsize=(10, 6))
-sns.boxplot(
-    data=model_data_cgo,
-    x='portfolio',
-    y='cap_gain_overhang',
-    order=unique_portfolios,       # ensure consistent order
-    palette=palette_colors         # use our custom palette
-)
-plt.title('Capital Gain Overhang by Portfolio')
-plt.xlabel('Portfolio')
-plt.ylabel('Capital Gain Overhang (%)')
-plt.tight_layout()
-plt.savefig(os.path.join(figures_folder, "cgo_boxplot_by_portfolio.png"))
-plt.close()
+# plt.figure(figsize=(10, 6))
+# sns.boxplot(
+#     data=model_data_cgo,
+#     x='portfolio',
+#     y='cap_gain_overhang',
+#     order=unique_portfolios,       # ensure consistent order
+#     palette=palette_colors         # use our custom palette
+# )
+# plt.title('Capital Gain Overhang by Portfolio')
+# plt.xlabel('Portfolio')
+# plt.ylabel('Capital Gain Overhang (%)')
+# plt.tight_layout()
+# plt.savefig(os.path.join(figures_folder, "cgo_boxplot_by_portfolio.png"))
+# plt.close()
 
-# -------------------------------
-# 3. Time Series Visualization
-# -------------------------------
+# # -------------------------------
+# # 3. Time Series Visualization
+# # -------------------------------
 
-# Calculate the average capital gain overhang for each month and portfolio.
-portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
-unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
-palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+# # Calculate the average capital gain overhang for each month and portfolio.
+# portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
+# unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
+# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
 
-plt.figure(figsize=(12, 6))
-for i, portfolio in enumerate(unique_portfolios):
-    sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
-    plt.plot(
-        sub_df['eom'], sub_df['cap_gain_overhang'],
-        marker='o',
-        label=portfolio,
-        color=palette_colors[i]
-    )
-plt.xlabel('Date (eom)')
-plt.ylabel('Average Capital Gain Overhang (%)')
-plt.title('Monthly Average Capital Gain Overhang by Portfolio')
-plt.xticks(rotation=45)
-plt.legend()
-plt.tight_layout()
-plt.savefig(os.path.join(figures_folder, "monthly_cgo_by_portfolio.png"))
-plt.close()
+# plt.figure(figsize=(12, 6))
+# for i, portfolio in enumerate(unique_portfolios):
+#     sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
+#     plt.plot(
+#         sub_df['eom'], sub_df['cap_gain_overhang'],
+#         marker='o',
+#         label=portfolio,
+#         color=palette_colors[i]
+#     )
+# plt.xlabel('Date (eom)')
+# plt.ylabel('Average Capital Gain Overhang (%)')
+# plt.title('Monthly Average Capital Gain Overhang by Portfolio')
+# plt.xticks(rotation=45)
+# plt.legend()
+# plt.tight_layout()
+# plt.savefig(os.path.join(figures_folder, "monthly_cgo_by_portfolio.png"))
+# plt.close()

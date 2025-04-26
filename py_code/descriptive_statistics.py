@@ -227,6 +227,11 @@ plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "monthly_returns.png"))
 plt.close()
 
+avg_returns = returns_df.mean()
+
+for port, r in avg_returns.items():
+    print(f"Average market-weighted return using small dataset for {port}: {r*100:.2f}%")
+
 print("done with small dataset")
 
 # ======================================================================================     
@@ -335,6 +340,11 @@ plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "monthly_returns_large.png"))
 plt.close()
 
+avg_returns = returns_df.mean()
+
+for port, r in avg_returns.items():
+    print(f"Average market-weighted return using large dataset for {port}: {r*100:.2f}%")
+
 print("done with large dataset")
 
 # ======================================================================================     
@@ -430,5 +440,10 @@ plt.xticks(rotation=45)
 plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "cumulative_returns_2004.png"))
 plt.close()
+
+avg_returns = returns_df.mean()
+
+for port, r in avg_returns.items():
+    print(f"Average market-weighted return using dataset starting 2004 for {port}: {r*100:.2f}%")
 
 print("done with 2004 dataset")
