@@ -41,8 +41,8 @@ unique_months = model_data['eom'].unique()
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
-#model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
-model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 

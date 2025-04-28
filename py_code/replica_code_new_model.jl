@@ -94,7 +94,7 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 
 ## =========== Our parameters ============= ##
 nu = 17 #changed
-σm = 0.07 #changed
+σm = 0.08 #changed
 Rf = 1 #unchanged
 
 γ̂, b0 = (2, 0.6) #unchanged
@@ -327,11 +327,11 @@ for j = 1:3
         end
         
         #θᵢ_rand = LinRange(0.00001,0.002,50)
-        θᵢ_rand = LinRange(0.000001,0.001,100)
+        θᵢ_rand = LinRange(0.00005,0.01,100)
         u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
         #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-        θᵢ_rand_neg = LinRange(-0.0005,-0.000001,100)
+        θᵢ_rand_neg = LinRange(-0.005,-0.00005,100)
         u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
         θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
@@ -378,7 +378,7 @@ for j = 1:3
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.0075,μ̂[j]-0.0025,100)
+        μ_pot = LinRange(μ̂[j]-0.0025,μ̂[j]+0.0025,100)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -514,17 +514,17 @@ for j = 1:3
 end
 
 #Utilities and alphas:
-utility_total = utility[1] * 100 + utility[2] * 100 + utility[3] * 100
+utility_total = utility[1] * 30 + utility[2] * 190 + utility[3] * 780
 
-utility_pt = utility_pt_low[1] * 100 * l[1] + utility_pt_high[1] * 100 * h[1] +
-              utility_pt_low[2] * 100 * l[2] + utility_pt_high[2] * 100 * h[2] +
-              utility_pt_low[3] * 100 * l[3] + utility_pt_high[3] * 100 * h[3]
+utility_pt = utility_pt_low[1] * 30 * l[1] + utility_pt_high[1] * 30 * h[1] +
+              utility_pt_low[2] * 190 * l[2] + utility_pt_high[2] * 190 * h[2] +
+              utility_pt_low[3] * 780 * l[3] + utility_pt_high[3] * 780 * h[3]
 
-utility_mv = utility_mv_low[1] * 100 * l[1] + utility_mv_high[1] * 100 * h[1] +
-              utility_mv_low[2] * 100 * l[2] + utility_mv_high[2] * 100 * h[2] +
-              utility_mv_low[3] * 100 * l[3] + utility_mv_high[3] * 100 * h[3]
+utility_mv = utility_mv_low[1] * 30 * l[1] + utility_mv_high[1] * 30 * h[1] +
+              utility_mv_low[2] * 190 * l[2] + utility_mv_high[2] * 190 * h[2] +
+              utility_mv_low[3] * 780 * l[3] + utility_mv_high[3] * 780 * h[3]
 
-market_return = theta_mi_all[1] * 100 * exp_exc_ret[1] + theta_mi_all[2] * 100 * exp_exc_ret[2] + theta_mi_all[3] * 100 * exp_exc_ret[3]
+market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
 
 alpha = exp_exc_ret - βᵢ_all * market_return
 
@@ -534,8 +534,8 @@ println("μ̂: $μ̂")
 println("Utility from each asset: $utility")
 println("Low holding of each asset: $theta_low")
 println("High holding of each asset: $theta_high")
-println("Fraction of investors with low holding: $x")
-println("Fraction of investors with high holding: $y")
+println("Fraction of investors with low holding: $l")
+println("Fraction of investors with high holding: $h")
 println("Utilty from low holding: $utility_pt_low")
 println("Utilty from high holding: $utility_pt_high")
 println("Utility total: $utility_total")

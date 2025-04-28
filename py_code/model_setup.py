@@ -28,9 +28,6 @@ model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 
-#================================== TEST - MAYBE REMOVE============================================
-model_data['ret_exc'] = model_data['ret_texc']
-bond_data['ret_exc'] = bond_data['ret_texc']
 # ===================================================================    
 #                     a. Set up portfolios by month        
 # ===================================================================
@@ -293,8 +290,8 @@ print("Done calculating capital gain overhang (CGO).")
 print("Calculating volatility and skewness...")
 model_data = model_data.sort_values(['cusip', 'eom'])
 
-model_data['ret_exc'] = model_data['ret_exc']
-model_data['log_ret'] = np.log(1 + model_data['ret_exc'])
+model_data['ret_texc'] = model_data['ret_texc']
+model_data['log_texc'] = np.log(1 + model_data['ret_texc'])
 
 def compute_annual_return(bond_df):
     """
@@ -307,7 +304,7 @@ def compute_annual_return(bond_df):
     annual_returns = []
     for i in range(len(bond_df)):
         if i - 12 <= len(bond_df):
-            window = bond_df.loc[i:i+11, 'log_ret']
+            window = bond_df.loc[i:i+11, 'log_texc']
             annual_ret = np.exp(window.sum()) - 1
         else:
             annual_ret = np.nan

@@ -43,10 +43,10 @@ print("\nAverage proportions across all months:")
 print(avg_portfolio_props)
 
 #Rounds the average proportions to even numbers
-N = 300 #TEST, MAYBE REVERSE
-pr_DI = 100 #TEST, MAYBE REVERSE
-pr_HY = 100 #TEST, MAYBE REVERSE
-pr_IG = 100 #TEST, MAYBE REVERSE
+N = 1000 #TEST, MAYBE REVERSE
+pr_DI = 30 #TEST, MAYBE REVERSE
+pr_HY = 190 #TEST, MAYBE REVERSE
+pr_IG = 780 #TEST, MAYBE REVERSE
 
 # For each month and portfolio, sum the market_value_past
 monthly_mv = (model_data_cgo.groupby(['eom', 'portfolio'])['market_value_start'].sum().reset_index()) #Finds the total market value of each portfolio during that month
