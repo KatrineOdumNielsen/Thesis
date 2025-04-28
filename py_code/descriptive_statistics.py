@@ -345,8 +345,12 @@ plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "monthly_returns_large.png"))
 plt.close()
 
-print("done with large dataset")
+avg_returns = returns_df.mean()
 
+for port, r in avg_returns.items():
+    print(f"Average market-weighted return using large dataset for {port}: {r*100:.2f}%")
+
+print("Done with large dataset.")
 # ======================================================================================     
 #       Market-weighted cumulative return for each rating group starting January 2004      
 # ======================================================================================                                                          
