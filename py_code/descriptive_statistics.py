@@ -28,7 +28,12 @@ figures_folder = project_dir + "/figures"
 # Read the CSV file
 bond_data = pd.read_csv("data/preprocessed/bond_data.csv")
 bond_data_large = pd.read_csv("data/preprocessed/bond_data_large.csv")
+bond_warga_data = pd.read_csv("data/preprocessed/bond_warga_data.csv")
+bond_data_large_warga = pd.read_csv("data/preprocessed/bond_data_large_warga.csv")
+bond_data_large_warga['eom'] = pd.to_datetime(bond_data_large_warga['eom'])
+bond_data_large['eom'] = pd.to_datetime(bond_data_large['eom'])
 bond_data['eom'] = pd.to_datetime(bond_data['eom'])
+bond_warga_data['eom'] = pd.to_datetime(bond_warga_data['eom'])
 
 model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date', 'distressed_rating_start']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
@@ -54,9 +59,17 @@ model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_star
 print("Descriptive statistics:")
 descriptive_variables = ['size', 'ret', 'duration', 'market_value_start', 'maturity_years','credit_spread_start', 'rating_num_start']
 summary_stats = bond_data[descriptive_variables].describe(include='all')
+print(summary_stats)
 summary_stats.to_csv("data/other/summary_statistics.csv")
 model_stats = model_data.describe(include='all')
 model_stats.to_csv("data/other/model_summary_statistics.csv")
+
+# Warga data
+descriptive_variables_warga = ['size', 'ret', 'market_value_start', 'maturity_years','credit_spread_start', 'rating_num_start']
+print("summary stats for warga:", bond_warga_data[descriptive_variables_warga].describe(include='all'))
+
+# full dataset
+print("summary stats including warga:", bond_data_large_warga[descriptive_variables_warga].describe(include='all'))
 
 # Average bond size across all bonds
 grouped = bond_data.groupby('cusip')
