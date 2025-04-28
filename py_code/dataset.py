@@ -41,8 +41,8 @@ bond_return_data['eom'] = pd.to_datetime(bond_return_data['eom'])
 bond_return_data = bond_return_data.merge(
     yield_curve[['1M']], left_on='eom', right_index=True, how='left'
 ) # adds yield data
-bond_return_data.rename(columns={'1M': 't_bill_1m'}, inplace=True) # rename for clarity
-bond_return_data['ret'] = bond_return_data['ret_exc'] + (1 + bond_return_data['t_bill_1m']) ** (1/12) - 1 # calculate total return
+bond_return_data.rename(columns={'1M': 't_bill_1'}, inplace=True) # rename for clarity
+bond_return_data['ret'] = bond_return_data['ret_exc'] + (1 + bond_return_data['t_bill_1']) ** (1/12) - 1 # calculate total return
 
 # Load WRDS data
 wrds_data = pd.read_csv(data_folder + "/raw/all_wrds_data.csv")
@@ -73,10 +73,10 @@ bond_additional_data_subset = bond_additional_data[columns_to_keep_descriptive]
 bond_additional_data_subset = bond_additional_data_subset.merge(
     yield_curve[['1M']], left_on='eom', right_index=True, how='left'
 ) # adds yield data
-bond_additional_data_subset.rename(columns={'1M': 't_bill_1m'}, inplace=True) # rename for clarity
+bond_additional_data_subset.rename(columns={'1M': 't_bill_1'}, inplace=True) # rename for clarity
 bond_additional_data_subset['yield'] = bond_additional_data_subset['wrds_yield']
 bond_additional_data_subset['ret'] = bond_additional_data_subset['ret_eom']
-bond_additional_data_subset['ret_exc'] = bond_additional_data_subset['ret'] - ((1 + bond_additional_data_subset['t_bill_1m']) ** (1/12) - 1) # excess return
+bond_additional_data_subset['ret_exc'] = bond_additional_data_subset['ret'] - ((1 + bond_additional_data_subset['t_bill_1']) ** (1/12) - 1) # excess return
 bond_additional_data_subset['ret_texc'] = bond_additional_data_subset['ret_exc'] # REQUIRED TO MERGE - IS NOT ACTUALLY CALCULATED CORRECTLY
 bond_additional_data_subset['market_value'] = bond_additional_data_subset['amount_outstanding'] * bond_additional_data_subset['price_eom'] * 10 # MV is NOT in '000s
 bond_additional_data_subset = bond_additional_data_subset[bond_data.columns]
@@ -182,7 +182,29 @@ bond_data_large['distressed_spread_start'] = bond_data_large['credit_spread_star
 # Finalizing the bond_data dataset
 bond_data = bond_data_large[bond_data_large['eom'] <= '2021-11-30']
 
+# Load warga data
+bond_warga_data = pd.read_csv(data_folder + "/preprocessed/bond_warga_data.csv")
+bond_warga_data['eom'] = pd.to_datetime(bond_warga_data['eom'])
+all_cols = sorted(set(bond_warga_data.columns) | set(bond_data_large.columns))
+bond_data_large_warga = pd.concat([
+    bond_warga_data.reindex(columns=all_cols),
+    bond_data_large.reindex(columns=all_cols)],
+    ignore_index=True,
+    sort=False)
+bond_data_large_warga = bond_data_large_warga.sort_values(['cusip','eom']).reset_index(drop=True)
+new_order = ['eom', 'cusip', 'market_value', 'ret_exc','ret_texc','yield',
+                                   't_bill_1','ret','security_level','size','amount_outstanding',
+                                   'coupon','rating_num','rating_class','warga_yield','wrds_yield',
+                                   'price_eom','ret_eom','tmt','maturity_years','duration','offering_date',
+                                   'interp_yield','credit_spread','rating_num_start',
+                                   'rating_class_start','price_eom_start','prior_eom',
+                                   'credit_spread_start','market_value_start','distressed_rating',
+                                   'distressed_rating_start','distressed_spread','distressed_spread_start']
+bond_data_large_warga = bond_data_large_warga[new_order]
+
 # Save the data
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
+bond_data_large_warga.to_csv("data/preprocessed/bond_data_large_warga.csv")
+
 print("done")
