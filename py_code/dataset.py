@@ -174,8 +174,8 @@ bond_data_large['rating_num_start'] = bond_data_large['rating_num_start'].fillna
 bond_data_large['rating_class_start'] = bond_data_large['rating_class_start'].fillna(bond_data_large['rating_class'])
 
 # Adding definitions of distress
-bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 18.5
-bond_data_large['distressed_rating_start'] = bond_data_large['rating_num_start'] > 18.5
+bond_data_large['distressed_rating'] = bond_data_large['rating_num'] > 16.5
+bond_data_large['distressed_rating_start'] = bond_data_large['rating_num_start'] > 16.5
 bond_data_large['distressed_spread'] = bond_data_large['credit_spread'] > 0.1
 bond_data_large['distressed_spread_start'] = bond_data_large['credit_spread_start'] > 0.1
 

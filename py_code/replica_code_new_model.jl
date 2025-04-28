@@ -475,7 +475,7 @@ for j = 1:3
         
         hetro_mu = μ̂[j]
 
-        θᵢ_rand = LinRange(0.000005,0.3,100)
+        θᵢ_rand = LinRange(0.00005,0.3,100)
         u_rand = Equation20.(θᵢ_rand,hetro_mu)
         MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
         PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)

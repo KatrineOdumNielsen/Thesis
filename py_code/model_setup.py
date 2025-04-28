@@ -61,51 +61,45 @@ print("Done setting up portfolios")
 # ===================================================================    
 #             b. Calculate monthly portfolio weighted returns        
 # ===================================================================
-# Get sorted unique month-end dates
-dates = sorted(bond_data['eom'].unique())
-date_series = []  # Store the dates for which we compute returns
+### Calculating returns for portfolios
+groups = model_data['portfolio'].dropna().unique().tolist()
 
-# Define the groups for which we compute returns
-groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
-
-# Initialize dictionaries/lists to store returns
+# Initialize storage for returns
 group_returns = {grp: [] for grp in groups}
-di_returns = []  # For distressed bonds
 market_returns = []
+date_series = []
 
-# Loop over each month (each date)
+# Get list of unique month-end dates
+dates = sorted(model_data['eom'].dropna().unique())
+
+# Loop through each month
 for dt in dates:
+    current_period = model_data[model_data['eom'] == dt]
+
+    # Skip if no data
+    if current_period.empty:
+        continue
+
     date_series.append(dt)
-    current_period = bond_data[bond_data['eom'] == dt]
-    
-    # For each group (IG and HY), compute the market-weighted return.
+
+    # Compute returns (texc) for each group
     for grp in groups:
-        group_data = current_period[current_period['rating_class_start'] == grp]
+        group_data = current_period[current_period['portfolio'] == grp]
         total_mv = group_data['market_value_start'].sum()
-        
+
         if len(group_data) > 0 and total_mv > 0:
             weights = group_data['market_value_start'] / total_mv
-            weighted_return = (weights * group_data['ret_exc']).sum()
+            weighted_return = (weights * group_data['ret_texc']).sum()
         else:
             weighted_return = 0
-        
+
         group_returns[grp].append(weighted_return)
-    
-    # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed_spread_start'] == True]
-    total_mv_di = distressed_data['market_value_start'].sum()
-    if len(distressed_data) > 0 and total_mv_di > 0:
-        weights_di = distressed_data['market_value_start'] / total_mv_di
-        weighted_return_di = (weights_di * distressed_data['ret_exc']).sum()
-    else:
-        weighted_return_di = 0
-    di_returns.append(weighted_return_di)
-    
-    # New section: compute total market-weighted return (across all bonds)
+
+    # Total market return across all portfolios (optional, but common)
     total_mv_all = current_period['market_value_start'].sum()
-    if len(current_period) > 0 and total_mv_all > 0:
+    if total_mv_all > 0:
         weights_all = current_period['market_value_start'] / total_mv_all
-        weighted_return_all = (weights_all * current_period['ret_exc']).sum()
+        weighted_return_all = (weights_all * current_period['ret_texc']).sum()
     else:
         weighted_return_all = 0
     market_returns.append(weighted_return_all)
@@ -113,12 +107,8 @@ for dt in dates:
 # 2. Create DataFrames for Returns
 # Create a DataFrame for monthly returns using the computed lists.
 returns_df = pd.DataFrame(group_returns, index=date_series)  
-returns_df['2.DI'] = di_returns 
 returns_df['market'] = market_returns
-returns_merged = returns_df
 returns_df.index.name = 'date'
-
-# Add a row on 2002-07-31 with values of 0 for all columns
 returns_df = returns_df.sort_index()
 returns_df.index = pd.to_datetime(returns_df.index)
 
@@ -128,7 +118,7 @@ returns_df_reset = returns_df.reset_index()
 # Melt the DataFrame to long format for the portfolios (excluding 'market')
 long_returns = returns_df_reset.melt(
     id_vars='date',
-    value_vars=['0.IG', '1.HY', '2.DI'],
+    value_vars=['IG', 'HY', 'DI'],
     var_name='portfolio',
     value_name='weighted_return'
 )
@@ -139,12 +129,6 @@ long_returns['market_return'] = long_returns['date'].map(
 )
 
 long_returns = long_returns.sort_values(['date', 'portfolio']).reset_index(drop=True)
-# Replace portfolio names
-long_returns['portfolio'] = long_returns['portfolio'].replace({
-    '0.IG': 'IG',
-    '1.HY': 'HY',
-    '2.DI': 'DI'
-})
 
 # Set portfolio as a categorical with custom order
 long_returns['portfolio'] = pd.Categorical(

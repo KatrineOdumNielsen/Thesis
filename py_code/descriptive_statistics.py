@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.cm as cm
 import seaborn as sns
+import numpy as np
 from scipy import stats
 
 #Set the working directory
@@ -29,10 +30,21 @@ bond_data = pd.read_csv("data/preprocessed/bond_data.csv")
 bond_data_large = pd.read_csv("data/preprocessed/bond_data_large.csv")
 bond_data['eom'] = pd.to_datetime(bond_data['eom'])
 
-model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date']]
+model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date', 'distressed_rating_start']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
+
+### Creating portfolios
+model_data['eom'] = pd.to_datetime(model_data['eom'])
+unique_months = model_data['eom'].unique()
+
+# Add portfolio to the model_data 
+model_data['portfolio'] = np.nan
+#model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
+model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
 # =============================================================================     
 #       Descriptive statistics for entire dataset          
@@ -124,51 +136,49 @@ DI_stats.to_csv("data/other/DI_summary_statistics.csv")
 #       Market-weighted cumulative return for each rating group using the small dataset and ret        
 # =================================================================================================                                               
 
-# 1. Compute Monthly Market-Weighted Returns Using ret
-dates = sorted(bond_data['eom'].unique())
-date_series = []  # Store the dates for which we compute returns
-groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
+### Calculating returns for portfolios
+groups = model_data['portfolio'].dropna().unique().tolist()
 
-# Initialize dictionaries/lists to store returns
-group_returns = {grp: [] for grp in groups}
-di_returns = []  # For distressed bonds
+# Initialize storage for returns
+group_ret = {grp: [] for grp in groups}
+date_series = []
 
-# Loop over each month (each date)
+# Get list of unique month-end dates
+dates = sorted(model_data['eom'].dropna().unique())
+
+# Loop through each month
 for dt in dates:
+    current_period = model_data[model_data['eom'] == dt]
+
+    # Skip if no data
+    if current_period.empty:
+        continue
+
     date_series.append(dt)
-    current_period = bond_data[bond_data['eom'] == dt]
-    
-    # For each group (IG and HY), compute the market-weighted return.
+
+    # Compute returns (texc) for each group
     for grp in groups:
-        group_data = current_period[current_period['rating_class_start'] == grp]
+        group_data = current_period[current_period['portfolio'] == grp]
         total_mv = group_data['market_value_start'].sum()
-        
+
         if len(group_data) > 0 and total_mv > 0:
             weights = group_data['market_value_start'] / total_mv
             weighted_return = (weights * group_data['ret']).sum()
         else:
             weighted_return = 0
-        
-        group_returns[grp].append(weighted_return)
-    
-    # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed_spread_start'] == True]
-    total_mv_di = distressed_data['market_value_start'].sum()
-    if len(distressed_data) > 0 and total_mv_di > 0:
-        weights_di = distressed_data['market_value_start'] / total_mv_di
-        weighted_return_di = (weights_di * distressed_data['ret']).sum()
-    else:
-        weighted_return_di = 0
-    di_returns.append(weighted_return_di)
 
+        group_ret[grp].append(weighted_return)
 
 # 2. Create DataFrames for Returns
-returns_df = pd.DataFrame(group_returns, index=date_series)  
-returns_df['2.DI'] = di_returns 
+returns_df = pd.DataFrame(group_ret, index=date_series)  
+mean_returns = returns_df.mean()
+std_returns = returns_df.std()
+print("Mean returns:", mean_returns)
+print("Standard deviation of returns:", std_returns)
 returns_df.index.name = 'date'
 
 # Add a row on 2002-07-31 with values of 0 for all columns
-first_row = pd.DataFrame({'0.IG': [0], '1.HY': [0], '2.DI': [0]}, index=[pd.Timestamp("2002-07-31")])
+first_row = pd.DataFrame({'IG': [0], 'HY': [0], 'DI': [0]}, index=[pd.Timestamp("2002-07-31")])
 returns_df = pd.concat([first_row, returns_df])
 returns_df = returns_df.sort_index()
 returns_df.index = pd.to_datetime(returns_df.index)
@@ -176,16 +186,13 @@ returns_df.index = pd.to_datetime(returns_df.index)
 # Compute cumulative returns: cumulative product of (1 + monthly_return).
 cumulative_df = (1 + returns_df).cumprod()  
 cumulative_df = 100 * cumulative_df
-first_row = pd.DataFrame({'0.IG': [100], '1.HY': [100], '2.DI': [100]}, index=[pd.Timestamp("2002-07-31")])
+first_row = pd.DataFrame({'IG': [100], 'HY': [100], 'DI': [100]}, index=[pd.Timestamp("2002-07-31")])
 cumulative_df = pd.concat([first_row, cumulative_df])
 cumulative_df = cumulative_df.sort_index()
 
 # 3. Combine Monthly and Cumulative Returns
 monthly_df = returns_df.reset_index()
 cum_df = cumulative_df.reset_index()
-
-# Rename cumulative columns to avoid collision.
-cum_df = cum_df.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
 
 # Merge the two DataFrames on 'date'
 monthly_df = monthly_df.reset_index().rename(columns={"index": "date"})
@@ -204,7 +211,7 @@ returns_df.index = pd.to_datetime(returns_df.index)
 cmap = cm.get_cmap('GnBu', 5).reversed()
 
 plt.figure(figsize=(12, 6))
-for i, col in enumerate(['IG_cum', 'HY_cum', 'DI_cum']):
+for i, col in enumerate(['IG', 'HY', 'DI']):
     plt.plot(cum_df['date'], cum_df[col], label=col, color=cmap(i+1))
 plt.title("Market-Weighted Cumulative Returns by Bond Class")
 plt.ylabel("Cumulative Return Index")
@@ -216,7 +223,7 @@ plt.close()
 
 # 8. Plot Monthly (Simple) Returns
 plt.figure(figsize=(12, 10))
-for i, col in enumerate(['0.IG', '1.HY', '2.DI']):
+for i, col in enumerate(['IG', 'HY', 'DI']):
     plt.plot(returns_df.index, returns_df[col], label=col, linestyle='-', color=cmap(i+1))
 plt.title("Monthly Market-Weighted Simple Returns by Rating Class")
 plt.xlabel("Date")
@@ -232,89 +239,87 @@ print("done with small dataset")
 # ======================================================================================     
 #       Market-weighted cumulative return for each rating group using the large dataset        
 # ======================================================================================                                                          
+# --- 1. Prepare Data ---
+model_data_large = bond_data_large[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start',
+                                    'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start',
+                                    'offering_date', 'distressed_rating_start']].copy()
 
-# 1. Compute Monthly Market-Weighted Returns Using ret
-# Get sorted unique month-end dates
-dates = sorted(bond_data_large['eom'].unique())
-date_series = []  # Store the dates for which we compute returns
+# Ensure datetime
+model_data_large['eom'] = pd.to_datetime(model_data_large['eom'])
+model_data_large['offering_date'] = pd.to_datetime(model_data_large['offering_date'])
 
-# Define the groups for which we compute returns
-groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
+# Save the smaller dataframe
+model_data_large.to_csv("data/preprocessed/model_data.csv", index=False)
 
-# Initialize dictionaries/lists to store returns
-group_returns = {grp: [] for grp in groups}
-di_returns = []  # For distressed bonds
+# --- 2. Create Portfolios ---
+model_data_large['portfolio'] = np.nan
+model_data_large.loc[model_data_large['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+model_data_large.loc[model_data_large['portfolio'].isnull() & (model_data_large['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
+model_data_large.loc[model_data_large['portfolio'].isnull() & (model_data_large['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
-# Loop over each month (each date)
-for dt in dates:
-    date_series.append(dt)
-    current_period = bond_data_large[bond_data_large['eom'] == dt]
-    
-    # For each group (IG and HY), compute the market-weighted return.
-    for grp in groups:
-        group_data = current_period[current_period['rating_class_start'] == grp]
+groups_large = model_data_large['portfolio'].dropna().unique().tolist()
+dates_large = sorted(model_data_large['eom'].dropna().unique())
+
+# --- 3. Calculate Monthly Returns ---
+group_ret_large = {grp: [] for grp in groups_large}
+date_series_large = []
+
+for dt in dates_large:
+    current_period = model_data_large[model_data_large['eom'] == dt]
+
+    if current_period.empty:
+        continue
+
+    date_series_large.append(dt)
+
+    for grp in groups_large:
+        group_data = current_period[current_period['portfolio'] == grp]
         total_mv = group_data['market_value_start'].sum()
-        
+
         if len(group_data) > 0 and total_mv > 0:
             weights = group_data['market_value_start'] / total_mv
             weighted_return = (weights * group_data['ret']).sum()
         else:
             weighted_return = 0
-        
-        group_returns[grp].append(weighted_return)
-    
-    # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed_spread_start'] == True]
-    total_mv_di = distressed_data['market_value_start'].sum()
-    if len(distressed_data) > 0 and total_mv_di > 0:
-        weights_di = distressed_data['market_value_start'] / total_mv_di
-        weighted_return_di = (weights_di * distressed_data['ret']).sum()
-    else:
-        weighted_return_di = 0
-    di_returns.append(weighted_return_di)
 
-# 2. Create DataFrames for Returns
-# Create a DataFrame for monthly returns using the computed lists.
-returns_df = pd.DataFrame(group_returns, index=date_series)  
-returns_df['2.DI'] = di_returns 
-returns_df.index.name = 'date'
-returns_df.index = pd.to_datetime(returns_df.index)
+        group_ret_large[grp].append(weighted_return)
 
-# Add a row on 2002-07-31 with values of 0 for all columns
-first_row = pd.DataFrame({'0.IG': [0], '1.HY': [0], '2.DI': [0]}, index=[pd.Timestamp("2002-07-31")])
-returns_df = pd.concat([first_row, returns_df])
-returns_df = returns_df.sort_index()
+returns_df_large = pd.DataFrame(group_ret_large, index=pd.to_datetime(date_series_large))
+returns_df_large.index.name = 'date'
 
-# Compute cumulative returns: cumulative product of (1 + monthly_return).
-cumulative_df = (1 + returns_df).cumprod()  
-cumulative_df = 100 * cumulative_df
-first_row = pd.DataFrame({'0.IG': [100], '1.HY': [100], '2.DI': [100]}, index=[pd.Timestamp("2002-07-31")])
-cumulative_df = pd.concat([first_row, cumulative_df])
-cumulative_df = cumulative_df.sort_index()
+# --- 4. Add First Row (Base Date) ---
+first_row = pd.DataFrame({'IG': [0], 'HY': [0], 'DI': [0]}, index=[pd.Timestamp("2002-07-31")])
+returns_df_large = pd.concat([first_row, returns_df_large]).sort_index()
 
-# 3. Combine Monthly and Cumulative Returns
-monthly_df = returns_df.reset_index()
-cum_df = cumulative_df.reset_index()
-cum_df = cum_df.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
-monthly_df = monthly_df.reset_index().rename(columns={"index": "date"})
-cum_df = cum_df.reset_index().rename(columns={"index": "date"})
-combined_df_large = pd.merge(monthly_df, cum_df, on='date')
+# --- 5. Cumulative Returns ---
+cumulative_df_large = (1 + returns_df_large).cumprod() * 100
+cumulative_df_large.index.name = 'date'
 
-# 4. Save Combined DataFrame to CSV
-output_path = os.path.join(data_folder, "preprocessed", "market_returns_combined.csv") 
-combined_df_large.to_csv(output_path, index=False) 
-print("Combined monthly and cumulative returns saved to:", output_path)
+# Ensure proper base at start
+first_row_cum = pd.DataFrame({'IG': [100], 'HY': [100], 'DI': [100]}, index=[pd.Timestamp("2002-07-31")])
+cumulative_df_large = pd.concat([first_row_cum, cumulative_df_large]).sort_index()
 
-cum_df['date'] = pd.to_datetime(cum_df['date'])
-returns_df.index = pd.to_datetime(returns_df.index)
+# --- 6. Combine Monthly and Cumulative ---
+monthly_df_large = returns_df_large.reset_index()
+cumulative_df_large.index.name = 'date'  # Important to name before reset
+cum_df_large = cumulative_df_large.reset_index()
 
-# 5. Plot Cumulative Returns
-cmap = cm.get_cmap('GnBu', 5).reversed()
+# Merge
+combined_df_large = pd.merge(monthly_df_large, cum_df_large, on='date', suffixes=('_monthly', '_cumulative'))
+
+# Save combined DataFrame
+output_path_large = os.path.join(data_folder, "preprocessed", "market_returns_large_combined.csv")
+combined_df_large.to_csv(output_path_large, index=False)
+
+print("Combined monthly and cumulative returns saved to:", output_path_large)
+
+# --- 7. Plot Cumulative Returns ---
+cmap_large = cm.get_cmap('GnBu', 5).reversed()
 
 plt.figure(figsize=(12, 6))
-for i, col in enumerate(['IG_cum', 'HY_cum', 'DI_cum']):
-    plt.plot(cum_df['date'], cum_df[col], label=col, color=cmap(i+1))
-plt.title("Market-Weighted Cumulative Returns by Bond Class (Large Dataset)")
+for i, col in enumerate(['IG', 'HY', 'DI']):
+    plt.plot(cum_df_large['date'], cum_df_large[col], label=col, color=cmap_large(i+1))
+plt.title("Market-Weighted Cumulative Returns by Bond Class (Extended Dataset)")
 plt.ylabel("Cumulative Return Index")
 plt.legend()
 plt.xticks(rotation=45)
@@ -322,11 +327,11 @@ plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "cumulative_returns_large.png"))
 plt.close()
 
-# 8. Plot Monthly (Simple) Returns
+# --- 8. Plot Monthly Returns ---
 plt.figure(figsize=(12, 10))
-for i, col in enumerate(['0.IG', '1.HY', '2.DI']):
-    plt.plot(returns_df.index, returns_df[col], label=col, linestyle='-', color=cmap(i+1))
-plt.title("Monthly Market-Weighted Simple Returns by Rating Class (Large Dataset)")
+for i, col in enumerate(['IG', 'HY', 'DI']):
+    plt.plot(returns_df_large.index, returns_df_large[col], label=col, linestyle='-', color=cmap_large(i+1))
+plt.title("Monthly Market-Weighted Simple Returns by Rating Class")
 plt.xlabel("Date")
 plt.ylabel("Monthly Return")
 plt.legend()
@@ -335,85 +340,34 @@ plt.tight_layout()
 plt.savefig(os.path.join(figures_folder, "monthly_returns_large.png"))
 plt.close()
 
-print("done with large dataset")
-
+print("Done with large dataset.")
 # ======================================================================================     
-#       Market-weighted cumulative return for each rating group starting july 2003        
+#       Market-weighted cumulative return for each rating group starting January 2004      
 # ======================================================================================                                                          
 
-# 1. Compute Monthly Market-Weighted Returns Using ret
-# Get sorted unique month-end dates
-bond_data = bond_data[bond_data['eom'] >= pd.Timestamp("2004-01-31")]
-dates = sorted(bond_data['eom'].unique())
-date_series = []  # Store the dates for which we compute returns
+# Getting returns starting from January 2004
+returns_df = pd.DataFrame(group_ret, index=date_series)  
+returns_df.index = pd.to_datetime(returns_df.index)  # make sure index is datetime
+returns_df = returns_df[returns_df.index >= pd.Timestamp("2004-01-01")]
 
-# Define the groups for which we compute returns
-groups = ['0.IG', '1.HY']  # Distressed bonds (DI) will be computed separately.
-
-# Initialize dictionaries/lists to store returns
-group_returns = {grp: [] for grp in groups}
-di_returns = []  # For distressed bonds
-
-# Loop over each month (each date)
-for dt in dates:
-    date_series.append(dt)
-    current_period = bond_data[bond_data['eom'] == dt]
-    
-    # For each group (IG and HY), compute the market-weighted return.
-    for grp in groups:
-        group_data = current_period[current_period['rating_class_start'] == grp]
-        total_mv = group_data['market_value_start'].sum()
-        
-        if len(group_data) > 0 and total_mv > 0:
-            weights = group_data['market_value_start'] / total_mv
-            weighted_return = (weights * group_data['ret']).sum()
-        else:
-            weighted_return = 0
-        
-        group_returns[grp].append(weighted_return)
-    
-    # For distressed bonds: subset of HY where is_distressed == True.
-    distressed_data = current_period[current_period['distressed_spread_start'] == True]
-    total_mv_di = distressed_data['market_value_start'].sum()
-    if len(distressed_data) > 0 and total_mv_di > 0:
-        weights_di = distressed_data['market_value_start'] / total_mv_di
-        weighted_return_di = (weights_di * distressed_data['ret']).sum()
-    else:
-        weighted_return_di = 0
-    di_returns.append(weighted_return_di)
-
-# 2. Create DataFrames for Returns
-# Create a DataFrame for monthly returns using the computed lists.
-returns_df = pd.DataFrame(group_returns, index=date_series)  
-returns_df['2.DI'] = di_returns 
-returns_df.index.name = 'date'
-returns_df.index = pd.to_datetime(returns_df.index)
-
-# Add a row on 2002-07-31 with values of 0 for all columns
-first_row = pd.DataFrame({'0.IG': [0], '1.HY': [0], '2.DI': [0]}, index=[pd.Timestamp("2004-01-31")])
+# Add a row on 2003-12-31 with values of 0 for all columns
+first_row = pd.DataFrame({'IG': [0], 'HY': [0], 'DI': [0]}, index=[pd.Timestamp("2003-12-31")])
 returns_df = pd.concat([first_row, returns_df])
 returns_df = returns_df.sort_index()
 
 # Compute cumulative returns: cumulative product of (1 + monthly_return).
 cumulative_df = (1 + returns_df).cumprod()  
 cumulative_df = 100 * cumulative_df
-first_row = pd.DataFrame({'0.IG': [100], '1.HY': [100], '2.DI': [100]}, index=[pd.Timestamp("2004-01-31")])
+first_row = pd.DataFrame({'IG': [100], 'HY': [100], 'DI': [100]}, index=[pd.Timestamp("2003-12-31")])
 cumulative_df = pd.concat([first_row, cumulative_df])
 cumulative_df = cumulative_df.sort_index()
 
 # 3. Combine Monthly and Cumulative Returns
 monthly_df = returns_df.reset_index()
 cum_df = cumulative_df.reset_index()
-cum_df = cum_df.rename(columns={'0.IG': 'IG_cum', '1.HY': 'HY_cum', '2.DI': 'DI_cum'})
 monthly_df = monthly_df.reset_index().rename(columns={"index": "date"})
 cum_df = cum_df.reset_index().rename(columns={"index": "date"})
 combined_df_2004 = pd.merge(monthly_df, cum_df, on='date')
-
-# 4. Save Combined DataFrame to CSV
-output_path = os.path.join(data_folder, "preprocessed", "market_returns_combined.csv") 
-combined_df_2004.to_csv(output_path, index=False) 
-print("Combined monthly and cumulative returns saved to:", output_path)
-
 cum_df['date'] = pd.to_datetime(cum_df['date'])
 returns_df.index = pd.to_datetime(returns_df.index)
 
@@ -421,7 +375,7 @@ returns_df.index = pd.to_datetime(returns_df.index)
 cmap = cm.get_cmap('GnBu', 5).reversed()
 
 plt.figure(figsize=(12, 6))
-for i, col in enumerate(['IG_cum', 'HY_cum', 'DI_cum']):
+for i, col in enumerate(['IG', 'HY', 'DI']):
     plt.plot(cum_df['date'], cum_df[col], label=col, color=cmap(i+1), linestyle='--')
 plt.title("Market-Weighted Cumulative Returns by Bond Class (starting 2004)")
 plt.ylabel("Cumulative Return Index")

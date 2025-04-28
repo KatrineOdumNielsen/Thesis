@@ -13,7 +13,6 @@ project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
 
 ### Getting data
-bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
 model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
 stock_returns = pd.read_csv(data_folder + "/raw/stock_market_returns.csv")
 long_term_gvt_bond_data = pd.read_csv(data_folder + "/raw/long_term_gvt_bond_data.csv")
@@ -22,25 +21,16 @@ t1m_daily = fred.get_series('DGS1MO') / 100  # Convert from % to decimal
 ### Creating portfolios
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 unique_months = model_data['eom'].unique()
-portfolio_by_month = {}
-
-for month in sorted(unique_months):
-    month_data = model_data[model_data['eom'] == month].copy()
-    # Assign portfolios for this month based on credit spread and rating class
-    month_data.loc[month_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
-    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
-    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
-    month_data.loc[month_data['portfolio'].isnull(), 'portfolio'] = 'Other'
-    portfolio_by_month[month] = month_data # Save the DataFrame for this month
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
 ### Calculating returns for portfolios
-groups = ['DI', 'HY', 'IG']
+groups = model_data['portfolio'].dropna().unique().tolist()
 
 # Initialize storage for returns
 group_ret_texc = {grp: [] for grp in groups}
@@ -116,7 +106,6 @@ long_term_gvt_bond_data = long_term_gvt_bond_data.loc[
 long_term_gvt_bond_data = long_term_gvt_bond_data.set_index('date')
 
 # Pull T-bill rate (1-month) from FRED and resample to monthly
-t1m_daily = fred.get_series('DGS1MO') / 100  # Convert from % to decimal
 t1m_daily = t1m_daily.ffill()  # Forward fill missing values
 
 # Resample to month-end
@@ -161,25 +150,25 @@ stock_returns['date'] = pd.to_datetime(stock_returns['date']).dt.normalize()
 stock_returns['date'] = pd.to_datetime(stock_returns['date']) + pd.offsets.MonthEnd(0)
 stock_returns.set_index('date', inplace=True)
 
-# Collecting into a single dataframe
-texc_returns_df = pd.DataFrame(group_ret_texc, index=pd.to_datetime(date_series))
-texc_returns_df['market_ret_texc'] = market_ret_texc
-texc_returns_df.index.name = 'date'
-texc_regression_df = texc_returns_df.iloc[24:]
-texc_regression_df = texc_regression_df * 12
+# # Collecting into a single dataframe
+# texc_returns_df = pd.DataFrame(group_ret_texc, index=pd.to_datetime(date_series))
+# texc_returns_df['market_ret_texc'] = market_ret_texc
+# texc_returns_df.index.name = 'date'
+# texc_regression_df = texc_returns_df.iloc[17:-32]
+# #texc_regression_df = texc_regression_df * 12
 
-# Define the independent variable (market excess return) and add a constant
-X = sm.add_constant(texc_regression_df[['market_ret_texc']])
+# # Define the independent variable (market excess return) and add a constant
+# X = sm.add_constant(texc_regression_df[['market_ret_texc']])
 
-# Store results in a dictionary
-texc_regression_results = {}
+# # Store results in a dictionary
+# texc_regression_results = {}
 
-# Loop through each portfolio and run the regression
-for portfolio in ['IG', 'HY', 'DI']:
-    y = texc_regression_df[portfolio]
-    model = sm.OLS(y, X).fit()
-    texc_regression_results[portfolio] = model
-    print(f"Regression results using ret_texc for {portfolio}:\n{model.summary()}\n")
+# # Loop through each portfolio and run the regression
+# for portfolio in groups: 
+#     y = texc_regression_df[portfolio]
+#     model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
+#     texc_regression_results[portfolio] = model
+#     print(f"Regression results using ret_texc for {portfolio}:\n{model.summary()}\n")
 
 # Collecting into a single dataframe
 exc_returns_df = pd.DataFrame(group_ret_exc, index=pd.to_datetime(date_series))
@@ -187,8 +176,8 @@ exc_returns_df['market_ret_texc'] = market_ret_texc
 exc_returns_df.index.name = 'date'
 exc_returns_df = exc_returns_df.join(term_returns[['term']], how='left')
 exc_returns_df = exc_returns_df.join(stock_returns[['stock_ret_exc']], how='left')
-exc_regression_df = exc_returns_df.iloc[24:]
-exc_regression_df = exc_regression_df * 12
+exc_regression_df = exc_returns_df.iloc[:-32]
+#exc_regression_df = exc_regression_df * 12
 
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term', 'stock_ret_exc']])
@@ -196,11 +185,18 @@ X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term', 'stock_ret_exc
 # Store results in a dictionary
 exc_regression_results = {}
 
-print(exc_regression_df.isnull().sum())
-
 # Loop through each portfolio and run the regression
-for portfolio in ['IG', 'HY', 'DI']:
+for portfolio in groups: 
     y = exc_regression_df[portfolio]
-    model = sm.OLS(y, X).fit()
+    model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
     exc_regression_results[portfolio] = model
     print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
+
+# # Shape ratios
+# print(exc_regression_df.tail())
+# exc_returns_mean = exc_returns_df.mean()
+# exc_returns_std = exc_returns_df.std()
+# exc_returns_sharpe = exc_returns_mean / exc_returns_std
+# print("Mean excess return:\n" + exc_returns_mean.to_string())
+# print("Standard deviation of excess return:\n" + exc_returns_std.to_string())
+# print("Sharpe ratio:\n" + exc_returns_sharpe.to_string())
