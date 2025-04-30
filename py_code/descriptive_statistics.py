@@ -267,7 +267,7 @@ model_data_large['eom'] = pd.to_datetime(model_data_large['eom'])
 model_data_large['offering_date'] = pd.to_datetime(model_data_large['offering_date'])
 
 # Save the smaller dataframe
-model_data_large.to_csv("data/preprocessed/model_data.csv", index=False)
+model_data_large.to_csv("data/preprocessed/model_data_large.csv", index=False)
 
 # --- 2. Create Portfolios ---
 model_data_large['portfolio'] = np.nan
