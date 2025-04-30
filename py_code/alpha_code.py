@@ -24,29 +24,29 @@ unique_months = model_data['eom'].unique()
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
-model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
-#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+#model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
-# # Now split DI into DI_high and DI_low based on price_eom_start
-# for month in unique_months:
-#     di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
-#     di_bonds = model_data.loc[di_mask]
+# Now split DI into DI_high and DI_low based on price_eom_start
+for month in unique_months:
+    di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
+    di_bonds = model_data.loc[di_mask]
     
-#     if len(di_bonds) > 0:
-#         # Sort DI bonds by price_eom_start descending
-#         di_bonds_sorted = di_bonds.sort_values('price_eom_start', ascending=False)
+    if len(di_bonds) > 0:
+        # Sort DI bonds by price_eom_start descending
+        di_bonds_sorted = di_bonds.sort_values('price_eom_start', ascending=False)
         
-#         # Find the number to split
-#         split_index = len(di_bonds_sorted) // 2
+        # Find the number to split
+        split_index = len(di_bonds_sorted) // 2
         
-#         # Assign DI_high and DI_low
-#         high_indices = di_bonds_sorted.index[:split_index]
-#         low_indices = di_bonds_sorted.index[split_index:]
+        # Assign DI_high and DI_low
+        high_indices = di_bonds_sorted.index[:split_index]
+        low_indices = di_bonds_sorted.index[split_index:]
         
-#         model_data.loc[high_indices, 'portfolio'] = 'DI_high'
-#         model_data.loc[low_indices, 'portfolio'] = 'DI_low'
+        model_data.loc[high_indices, 'portfolio'] = 'DI_high'
+        model_data.loc[low_indices, 'portfolio'] = 'DI_low'
 
 ### Calculating returns for portfolios
 groups = model_data['portfolio'].dropna().unique().tolist()
@@ -173,8 +173,8 @@ stock_returns.set_index('date', inplace=True)
 texc_returns_df = pd.DataFrame(group_ret_texc, index=pd.to_datetime(date_series))
 texc_returns_df['market_ret_texc'] = market_ret_texc
 texc_returns_df.index.name = 'date'
-texc_regression_df = texc_returns_df.iloc[:-32]
-#texc_regression_df = texc_regression_df * 12
+texc_regression_df = texc_returns_df.iloc[:]
+texc_regression_df = texc_regression_df * 12
 
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(texc_regression_df[['market_ret_texc']])
@@ -195,7 +195,7 @@ exc_returns_df['market_ret_texc'] = market_ret_texc
 exc_returns_df.index.name = 'date'
 exc_returns_df = exc_returns_df.join(term_returns[['term']], how='left')
 exc_returns_df = exc_returns_df.join(stock_returns[['stock_ret_exc']], how='left')
-exc_regression_df = exc_returns_df.iloc[:-32]
+exc_regression_df = exc_returns_df.iloc[:]
 #exc_regression_df = exc_regression_df * 12
 
 # Define the independent variable (market excess return) and add a constant
@@ -211,27 +211,29 @@ for portfolio in groups:
     exc_regression_results[portfolio] = model
     print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
 
-# Shape ratios
-print(exc_regression_df.tail())
-print(texc_regression_df.tail())
 print(exc_regression_df.head())
-print(texc_regression_df.head())
 
-exc_returns_mean = exc_regression_df.mean()
-exc_returns_std = exc_regression_df.std()
-exc_returns_sharpe = exc_returns_mean / exc_returns_std
-print("Mean excess return:\n" + exc_returns_mean.to_string())
-print("Standard deviation of excess return:\n" + exc_returns_std.to_string())
-print("Sharpe ratio:\n" + exc_returns_sharpe.to_string())
+# # Shape ratios
+# print(exc_regression_df.tail())
+# print(texc_regression_df.tail())
+# print(exc_regression_df.head())
+# print(texc_regression_df.head())
 
-# Cumulative return
-cum_return = (1 + texc_regression_df['market_ret_texc']).prod() - 1
+# exc_returns_mean = exc_regression_df.mean()
+# exc_returns_std = exc_regression_df.std()
+# exc_returns_sharpe = exc_returns_mean / exc_returns_std
+# print("Mean excess return:\n" + exc_returns_mean.to_string())
+# print("Standard deviation of excess return:\n" + exc_returns_std.to_string())
+# print("Sharpe ratio:\n" + exc_returns_sharpe.to_string())
+
+# # Cumulative return
+# cum_return = (1 + texc_regression_df['market_ret_texc']).prod() - 1
 
 # Number of months
 n_months = texc_regression_df.shape[0]
 
-# Annualized return
-annualized_return = (1 + cum_return) ** (12 / n_months) - 1
+# # Annualized return
+# annualized_return = (1 + cum_return) ** (12 / n_months) - 1
 
-print(f"Cumulative pure credit market return: {cum_return:.4%}")
-print(f"Annualized pure credit market return: {annualized_return:.4%}")
+# print(f"Cumulative pure credit market return: {cum_return:.4%}")
+# print(f"Annualized pure credit market return: {annualized_return:.4%}")
