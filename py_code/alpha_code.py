@@ -228,8 +228,8 @@ print(texc_regression_df)
 # # Cumulative return
 # cum_return = (1 + texc_regression_df['market_ret_texc']).prod() - 1
 
-# # Number of months
-# n_months = texc_regression_df.shape[0]
+# Number of months
+n_months = texc_regression_df.shape[0]
 
 # # Annualized return
 # annualized_return = (1 + cum_return) ** (12 / n_months) - 1
