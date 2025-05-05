@@ -23,8 +23,7 @@ data_folder = project_dir + "/data"
 figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
-bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
+model_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 
@@ -32,39 +31,34 @@ model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 #                     a. Set up portfolios by month        
 # ===================================================================
 print("Setting up portfolios by month...")                                                         
-bond_data['eom'] = pd.to_datetime(model_data['eom'])
+model_data['eom'] = pd.to_datetime(model_data['eom'])
 unique_months = model_data['eom'].unique()
 portfolio_by_month = {}
 
-# Add portfolio to the model_data 
+# Add portfolio to the model_data
 model_data['portfolio'] = np.nan
-#model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
-model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 model_data.to_csv("data/preprocessed/model_data_split.csv")
 print("Done setting up portfolios")
 
-# Now split DI into DI_high and DI_low based on price_eom_start
+# Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-10)
 for month in unique_months:
+    # Filter for DI bonds in the current month
     di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
     di_bonds = model_data.loc[di_mask]
     
     if len(di_bonds) > 0:
-        # Sort DI bonds by price_eom_start descending
-        di_bonds_sorted = di_bonds.sort_values('price_eom_start', ascending=False)
+        # Assign DI_high to bonds with cap_gain_overhang_start > -5
+        high_indices = di_bonds[di_bonds['cap_gain_overhang_start'] > -10].index
         
-        # Find the number to split
-        split_index = len(di_bonds_sorted) // 2
-        
-        # Assign DI_high and DI_low
-        high_indices = di_bonds_sorted.index[:split_index]
-        low_indices = di_bonds_sorted.index[split_index:]
+        # Assign DI_low to bonds with cap_gain_overhang_start <= -5
+        low_indices = di_bonds[di_bonds['cap_gain_overhang_start'] <= -10].index
         
         model_data.loc[high_indices, 'portfolio'] = 'DI_high'
         model_data.loc[low_indices, 'portfolio'] = 'DI_low'
-
-
 # ===================================================================    
 #             b. Calculate monthly portfolio weighted returns        
 # ===================================================================

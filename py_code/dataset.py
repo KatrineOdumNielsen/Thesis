@@ -5,6 +5,7 @@ import seaborn as sns
 import numpy as np
 from fredapi import Fred
 fred = Fred(api_key='01b2825140d39531d70a035eaf06853d')
+from datetime import datetime
 
 #Set the working directory
 project_dir = os.getcwd()   # Change to your project directory
@@ -205,6 +206,82 @@ new_order = ['eom', 'cusip', 'market_value', 'ret_exc','ret_texc','yield',
                                    'credit_spread_start','market_value_start','distressed_rating',
                                    'distressed_rating_start','distressed_spread','distressed_spread_start']
 bond_data_large_warga = bond_data_large_warga[new_order]
+
+#Calculating capital gain overhang for bond_data
+cap_gain_data = wrds_data[['eom', 'cusip', 'price_eom', 'offering_date']]
+print("Calculating capital gain overhang (CGO)...")
+cap_gain_data['offering_date'] = pd.to_datetime(cap_gain_data['offering_date'])
+monthly_turnover = 0.015 #using quarterly turnover of 4.5% from Peter's paper
+
+def compute_effective_purchase_price_exponential(group):
+    """
+    For a given bond (grouped by 'cusip'), compute the effective purchase price and 
+    capital gain overhang for each month, using an exponentially decaying approach 
+    that assigns the largest weight to the earliest date (k=0).
+
+    Logic:
+      - For i data points (i.e., up to index i-1),
+        earliest date gets (1 - p)^(i-1),
+        date k in [1..i-1] gets p * (1 - p)^(i-1 - k),
+        sum of weights = 1.
+      - p = monthly_turnover
+    """
+    group = group.sort_values('eom').copy()
+    
+    effective_prices = [group.iloc[0]['price_eom']]
+    cgo_values = [0.0]
+
+    
+    for i in range(1, len(group)):
+        # We have i observations so far: 0, 1, ..., i-1
+        # The earliest observation is index 0, the newest is index i-1
+        n = i  # number of past observations
+        p = monthly_turnover
+        
+        # Create an array of length n for the weights
+        # k=0 => earliest date
+        # k=1..n-1 => subsequent dates
+        weights = np.zeros(n)
+        
+        # earliest date gets (1 - p)^(n-1)
+        weights[0] = (1 - p)**(n - 1)
+        
+        # for k in [1..n-1], w_k = p * (1 - p)^(n-1 - k)
+        for k in range(1, n):
+            weights[k] = p * (1 - p)**(n - 1 - k)
+        
+        # The i-th row in group corresponds to the 'current' date
+        # The 'past_prices' are the prices from index 0..(i-1)
+        past_prices = group.iloc[:i]['price_eom'].values
+
+         # Apply the condition to adjust price_eom for k=0
+        if group.iloc[0]['offering_date'] < datetime(2002, 7, 31):
+            past_prices[0] = 100
+        
+        # Weighted sum of the past prices
+        effective_price = np.sum(weights * past_prices)
+        effective_prices.append(effective_price)
+        
+        # Current price is the price at row i
+        current_price = group.iloc[i]['price_eom']
+        cgo = (current_price / effective_price - 1) * 100
+        cgo_values.append(cgo)
+    
+    group['effective_price'] = effective_prices
+    group['cap_gain_overhang'] = cgo_values
+    return group
+
+print('Applying the function group-wise by bond (cusip) ...')
+cap_gain_data = cap_gain_data.sort_values(['cusip', 'eom'])
+cap_gain_data = cap_gain_data.groupby('cusip').apply(compute_effective_purchase_price_exponential).reset_index(drop=True)
+cap_gain_data['cap_gain_overhang_start'] = cap_gain_data['cap_gain_overhang'].shift(1)
+
+bond_data = pd.merge(
+    bond_data,
+    cap_gain_data[['cusip', 'eom', 'cap_gain_overhang_start']],
+    on=['cusip', 'eom'],
+    how='left'
+)
 
 # Save the data
 bond_data.to_csv("data/preprocessed/bond_data.csv")

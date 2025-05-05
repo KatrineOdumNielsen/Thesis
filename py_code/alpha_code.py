@@ -7,43 +7,42 @@ import numpy as np
 from fredapi import Fred
 fred = Fred(api_key='01b2825140d39531d70a035eaf06853d')
 import statsmodels.api as sm
+from datetime import datetime
 
 #Set the working directory
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
 
 ### Getting data
-model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
+model_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
 stock_returns = pd.read_csv(data_folder + "/raw/stock_market_returns.csv")
 long_term_gvt_bond_data = pd.read_csv(data_folder + "/raw/long_term_gvt_bond_data.csv")
 t1m_daily = fred.get_series('DGS1MO') / 100  # Convert from % to decimal
 
 ### Creating portfolios
 model_data['eom'] = pd.to_datetime(model_data['eom'])
+model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 unique_months = model_data['eom'].unique()
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
-#model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
-model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
-# Now split DI into DI_high and DI_low based on price_eom_start
+# Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-10)
 for month in unique_months:
+    # Filter for DI bonds in the current month
     di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
     di_bonds = model_data.loc[di_mask]
     
     if len(di_bonds) > 0:
-        # Sort DI bonds by price_eom_start descending
-        di_bonds_sorted = di_bonds.sort_values('price_eom_start', ascending=False)
+        # Assign DI_high to bonds with cap_gain_overhang_start > -10
+        high_indices = di_bonds[di_bonds['cap_gain_overhang_start'] > -10]  .index
         
-        # Find the number to split
-        split_index = len(di_bonds_sorted) // 2
-        
-        # Assign DI_high and DI_low
-        high_indices = di_bonds_sorted.index[:split_index]
-        low_indices = di_bonds_sorted.index[split_index:]
+        # Assign DI_low to bonds with cap_gain_overhang_start <= -10
+        low_indices = di_bonds[di_bonds['cap_gain_overhang_start'] <= -10].index
         
         model_data.loc[high_indices, 'portfolio'] = 'DI_high'
         model_data.loc[low_indices, 'portfolio'] = 'DI_low'
@@ -174,7 +173,7 @@ texc_returns_df = pd.DataFrame(group_ret_texc, index=pd.to_datetime(date_series)
 texc_returns_df['market_ret_texc'] = market_ret_texc
 texc_returns_df.index.name = 'date'
 texc_regression_df = texc_returns_df.iloc[:]
-texc_regression_df = texc_regression_df * 12
+#texc_regression_df = texc_regression_df * 12
 
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(texc_regression_df[['market_ret_texc']])
@@ -198,20 +197,20 @@ exc_returns_df = exc_returns_df.join(stock_returns[['stock_ret_exc']], how='left
 exc_regression_df = exc_returns_df.iloc[:]
 #exc_regression_df = exc_regression_df * 12
 
-# Define the independent variable (market excess return) and add a constant
-X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term', 'stock_ret_exc']])
+# # Define the independent variable (market excess return) and add a constant
+# X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term', 'stock_ret_exc']])
 
-# Store results in a dictionary
-exc_regression_results = {}
+# # Store results in a dictionary
+# exc_regression_results = {}
 
-# Loop through each portfolio and run the regression
-for portfolio in groups: 
-    y = exc_regression_df[portfolio]
-    model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
-    exc_regression_results[portfolio] = model
-    print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
+# # Loop through each portfolio and run the regression
+# for portfolio in groups: 
+#     y = exc_regression_df[portfolio]
+#     model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
+#     exc_regression_results[portfolio] = model
+#     print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
 
-print(exc_regression_df.head())
+print(texc_regression_df)
 
 # # Shape ratios
 # print(exc_regression_df.tail())
@@ -226,14 +225,14 @@ print(exc_regression_df.head())
 # print("Standard deviation of excess return:\n" + exc_returns_std.to_string())
 # print("Sharpe ratio:\n" + exc_returns_sharpe.to_string())
 
-# # Cumulative return
-# cum_return = (1 + texc_regression_df['market_ret_texc']).prod() - 1
+# Cumulative return
+cum_return = (1 + texc_regression_df['DI_high']).prod() - 1
 
 # Number of months
 n_months = texc_regression_df.shape[0]
 
-# # Annualized return
-# annualized_return = (1 + cum_return) ** (12 / n_months) - 1
+# Annualized return
+annualized_return = (1 + cum_return) ** (12 / n_months) - 1
 
-# print(f"Cumulative pure credit market return: {cum_return:.4%}")
-# print(f"Annualized pure credit market return: {annualized_return:.4%}")
+print(f"Cumulative pure credit market return: {cum_return:.4%}")
+print(f"Annualized pure credit market return: {annualized_return:.4%}")
