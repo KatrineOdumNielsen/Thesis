@@ -31,21 +31,21 @@ model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
-# # Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-5)
-# for month in unique_months:
-#     # Filter for DI bonds in the current month
-#     di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
-#     di_bonds = model_data.loc[di_mask]
+# Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-10)
+for month in unique_months:
+    # Filter for DI bonds in the current month
+    di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
+    di_bonds = model_data.loc[di_mask]
     
-#     if len(di_bonds) > 0:
-#         # Assign DI_high to bonds with cap_gain_overhang_start > -5
-#         high_indices = di_bonds[di_bonds['cap_gain_overhang_start'] > -10].index
+    if len(di_bonds) > 0:
+        # Assign DI_high to bonds with cap_gain_overhang_start > -10
+        high_indices = di_bonds[di_bonds['cap_gain_overhang_start'] > -10]  .index
         
-#         # Assign DI_low to bonds with cap_gain_overhang_start <= -5
-#         low_indices = di_bonds[di_bonds['cap_gain_overhang_start'] <= -10].index
+        # Assign DI_low to bonds with cap_gain_overhang_start <= -10
+        low_indices = di_bonds[di_bonds['cap_gain_overhang_start'] <= -10].index
         
-#         model_data.loc[high_indices, 'portfolio'] = 'DI_high'
-#         model_data.loc[low_indices, 'portfolio'] = 'DI_low'
+        model_data.loc[high_indices, 'portfolio'] = 'DI_high'
+        model_data.loc[low_indices, 'portfolio'] = 'DI_low'
 
 ### Calculating returns for portfolios
 groups = model_data['portfolio'].dropna().unique().tolist()
@@ -225,14 +225,14 @@ print(texc_regression_df)
 # print("Standard deviation of excess return:\n" + exc_returns_std.to_string())
 # print("Sharpe ratio:\n" + exc_returns_sharpe.to_string())
 
-# # Cumulative return
-# cum_return = (1 + texc_regression_df['market_ret_texc']).prod() - 1
+# Cumulative return
+cum_return = (1 + texc_regression_df['DI_high']).prod() - 1
 
 # Number of months
 n_months = texc_regression_df.shape[0]
 
-# # Annualized return
-# annualized_return = (1 + cum_return) ** (12 / n_months) - 1
+# Annualized return
+annualized_return = (1 + cum_return) ** (12 / n_months) - 1
 
-# print(f"Cumulative pure credit market return: {cum_return:.4%}")
-# print(f"Annualized pure credit market return: {annualized_return:.4%}")
+print(f"Cumulative pure credit market return: {cum_return:.4%}")
+print(f"Annualized pure credit market return: {annualized_return:.4%}")

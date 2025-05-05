@@ -104,8 +104,8 @@ a = 5 #new parameter
 Ri = 0.01 #changed
 mu = 0.005 #changed
 
-theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
-average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
+theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df_split.csv")))
+average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_split_updated.csv")))
 
 σᵢ_all = average_metrics_updated.volatility
 βᵢ_all = average_metrics_updated.beta
@@ -120,24 +120,24 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 #%% Calculate μ̂ and θ̂ᵢ
 # μ̂ = zeros(10,1)
 # θ̂ᵢ = zeros(10,1)
-μ̂ = zeros(3,1)
-θ̂ᵢ = zeros(3,1)
-exp_exc_ret = zeros(3,1)
-alpha = zeros(3,1)
-utility = zeros(3,1)
-utility_pt_high = zeros(3,1)
-utility_mv_high = zeros(3,1)
-utility_pt_low = zeros(3,1)
-utility_mv_low = zeros(3,1)
-theta_high = zeros(3,1)
-theta_low = zeros(3,1)
-l = ones(3,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
-h = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
+μ̂ = zeros(4,1)
+θ̂ᵢ = zeros(4,1)
+exp_exc_ret = zeros(4,1)
+alpha = zeros(4,1)
+utility = zeros(4,1)
+utility_pt_high = zeros(4,1)
+utility_mv_high = zeros(4,1)
+utility_pt_low = zeros(4,1)
+utility_mv_low = zeros(4,1)
+theta_high = zeros(4,1)
+theta_low = zeros(4,1)
+l = ones(4,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
+h = zeros(4,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
-bound = [20,20,15]
+bound = [20,20,20,2.5]
 
-for j = 1:3
+for j = 1:4
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]
@@ -169,6 +169,10 @@ for j = 1:3
             
             #println("p_Ri: For Ri = $Ri, result = $result")
             
+            if isnan(result) || isinf(result)
+                result = 0.0
+            end
+
             return result
             
         end
@@ -236,8 +240,7 @@ for j = 1:3
         #println("neg_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (Rf - x) - theta_i_minus1 * g_i)^(α - 1)) *
                                  (Rf - x) * dwP_Ri(x, mu, Si, zetai),
-                                 lower_bound, upper_bound, rtol=1e-4
-                                 )
+                                 lower_bound, upper_bound, rtol=1e-3)
         #println("neg_integral: Result = $integral, error estimate = $err")
         return integral
     end
@@ -248,7 +251,7 @@ for j = 1:3
         upper_bound = U_bound
         #println("pos_integral: Integrating from $lower_bound to $upper_bound")
         integral, err = quadgk(x -> ((theta_mi * (x-Rf) + theta_i_minus1 * g_i) ^(α-1)) * (x-Rf) * dwP_1_Ri(x, mu, Si, zetai), 
-        lower_bound, upper_bound, rtol=1e-4)
+        lower_bound, upper_bound, rtol=1e-3)
         #println("pos_integral: Result = $integral, error estimate = $err")
         return integral
     end
@@ -259,10 +262,10 @@ for j = 1:3
         upper_bound = Rf-theta_i_minus1*g_i/θᵢ
         if θᵢ >= 0
             integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-4)
+            lower_bound, upper_bound, rtol=1e-3)
         elseif θᵢ < 0
             integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-4)
+            lower_bound, upper_bound, rtol=1e-3)
         end
         #println("neg_integral20: Result = $integral, error estimate = $err")
         return integral
@@ -274,10 +277,10 @@ for j = 1:3
         upper_bound = U_bound
         if θᵢ >= 0
             integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-4)
+            lower_bound, upper_bound, rtol=1e-3)
         elseif θᵢ < 0
             integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
-            lower_bound, upper_bound, rtol=1e-4)
+            lower_bound, upper_bound, rtol=1e-3)
         end
         #println("pos_integral20: Result = $integral, error estimate = $err")
         return integral
@@ -379,7 +382,7 @@ for j = 1:3
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.0025,μ̂[j]+0.0025,100)
+        μ_pot = LinRange(μ̂[j]-0.005,μ̂[j],100)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -515,17 +518,19 @@ for j = 1:3
 end
 
 #Utilities and alphas:
-utility_total = utility[1] * 30 + utility[2] * 190 + utility[3] * 780
+utility_total = utility[1] * 20 + utility[2] * 20 + utility[3] * 180 + utility[4] * 780
 
-utility_pt = utility_pt_low[1] * 30 * l[1] + utility_pt_high[1] * 30 * h[1] +
-              utility_pt_low[2] * 190 * l[2] + utility_pt_high[2] * 190 * h[2] +
-              utility_pt_low[3] * 780 * l[3] + utility_pt_high[3] * 780 * h[3]
+utility_pt = utility_pt_low[1] * 20 * l[1] + utility_pt_high[1] * 20 * h[1] +
+              utility_pt_low[2] * 20 * l[2] + utility_pt_high[2] * 20 * h[2] +
+              utility_pt_low[3] * 180 * l[3] + utility_pt_high[3] * 180 * h[3]
+              utility_pt_low[4] * 780 * l[4] + utility_pt_high[4] * 780 * h[4]
 
-utility_mv = utility_mv_low[1] * 30 * l[1] + utility_mv_high[1] * 30 * h[1] +
-              utility_mv_low[2] * 190 * l[2] + utility_mv_high[2] * 190 * h[2] +
-              utility_mv_low[3] * 780 * l[3] + utility_mv_high[3] * 780 * h[3]
+utility_mv = utility_mv_low[1] * 20 * l[1] + utility_mv_high[1] * 20 * h[1] +
+              utility_mv_low[2] * 20 * l[2] + utility_mv_high[2] * 20 * h[2] +
+              utility_mv_low[3] * 180 * l[3] + utility_mv_high[3] * 180 * h[3]
+                utility_mv_low[4] * 780 * l[4] + utility_mv_high[4] * 780 * h[4]
 
-market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
+market_return = theta_mi_all[1] * 20 * exp_exc_ret[1] + theta_mi_all[2] * 20 * exp_exc_ret[2] + theta_mi_all[3] * 180 * exp_exc_ret[3] + theta_mi_all[4] * 780 * exp_exc_ret[4]
 
 alpha = exp_exc_ret - βᵢ_all * market_return
 
