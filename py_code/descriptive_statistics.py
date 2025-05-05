@@ -57,7 +57,7 @@ model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_star
 
 #Load descriptive statistics
 print("Descriptive statistics:")
-descriptive_variables = ['size', 'ret', 'duration', 'market_value_start', 'maturity_years','credit_spread_start', 'rating_num_start']
+descriptive_variables = ['size', 'ret', 'ret_texc', 'duration', 'market_value_start', 'maturity_years','credit_spread_start', 'rating_num_start']
 summary_stats = bond_data[descriptive_variables].describe(include='all')
 print(summary_stats)
 summary_stats.to_csv("data/other/summary_statistics.csv")
@@ -130,17 +130,23 @@ plt.close()
 # =============================================================================     
 #       Descriptive statistics for different rating groups          
 # =============================================================================                                                          
+bond_data['portfolio'] = np.nan
+bond_data.loc[bond_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+bond_data.loc[bond_data['portfolio'].isnull() & (bond_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
+bond_data.loc[bond_data['portfolio'].isnull() & (bond_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
-# Divide into groups based on the rating type
-IG = bond_data[bond_data['rating_class'] == '0.IG']
-HY = bond_data[bond_data['rating_class'] == '1.HY']
-DI = bond_data[bond_data['credit_spread'] > 0.1]
+# Divide into groups based on the assigned portfolio
+IG = bond_data[bond_data['portfolio'] == 'IG']
+HY = bond_data[bond_data['portfolio'] == 'HY']
+DI = bond_data[bond_data['portfolio'] == 'DI']
 
-
-# descriptive statistics for each group
+# Descriptive statistics for each group
 IG_stats = IG[descriptive_variables].describe()
 HY_stats = HY[descriptive_variables].describe()
 DI_stats = DI[descriptive_variables].describe()
+
+# Export to CSV
 IG_stats.to_csv("data/other/IG_summary_statistics.csv")
 HY_stats.to_csv("data/other/HY_summary_statistics.csv")
 DI_stats.to_csv("data/other/DI_summary_statistics.csv")

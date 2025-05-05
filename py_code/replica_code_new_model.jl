@@ -97,8 +97,8 @@ nu = 17 #changed
 σm = 0.08 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (2, 0.6) #unchanged
-a = 5 #new parameter
+γ̂, b0 = (2, 0.3) #changed
+a = 1 #new parameter
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed

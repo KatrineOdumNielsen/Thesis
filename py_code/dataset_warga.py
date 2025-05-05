@@ -72,6 +72,9 @@ bond_warga_data['ret_exc'] = (bond_warga_data['ret']
     - ((1 + bond_warga_data['t_bill_1']) ** (1/12) - 1))
 bond_warga_data['ret_texc'] = bond_warga_data['ret_exc']
 
+#printing min and max dates
+print("min date: ", bond_warga_data['eom'].min())
+print("max date: ", bond_warga_data['eom'].max())
 
 # Adding credit spread to the data. First, define a function that can interpolate the yield curve.
 yield_curve.columns = [

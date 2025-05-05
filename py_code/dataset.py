@@ -44,6 +44,10 @@ bond_return_data = bond_return_data.merge(
 bond_return_data.rename(columns={'1M': 't_bill_1'}, inplace=True) # rename for clarity
 bond_return_data['ret'] = bond_return_data['ret_exc'] + (1 + bond_return_data['t_bill_1']) ** (1/12) - 1 # calculate total return
 
+#printing min and max dates
+print("min date: ", bond_return_data['eom'].min())
+print("max date: ", bond_return_data['eom'].max())
+
 # Load WRDS data
 wrds_data = pd.read_csv(data_folder + "/raw/all_wrds_data.csv")
 wrds_data.columns = wrds_data.columns.str.lower()

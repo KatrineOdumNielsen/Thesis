@@ -136,9 +136,9 @@ h = zeros(4,1) #fraction of investors with high holding (only relevant for hetro
 const P_eps = 1e-8
 
 ## list for bounds of integrals
-bound = [40,20,20,15]
+bound = [20,20,20,15]
 
-for j = 1:4
+for j = 1:4 #4
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]
@@ -153,7 +153,7 @@ for j = 1:4
     theta_i_minus1 = theta_i_minus1_all[j]
 
     function p_Ri(Ri, mu, Si, zetai)
-        threshold = 0.01
+        threshold = 0.001
 
         if abs(zetai) < threshold
             # Formula for the case ξ = 0
@@ -182,7 +182,7 @@ for j = 1:4
     # Define P_Ri
     function P_Ri(x, mu, Si, zetai)
         #println("P_Ri: Computing integral for x = $x, mu = $mu, Si = $Si, zetai = $zetai")
-        integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-6)
+        integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-8)
         #println("P_Ri: Integral = $integral, error estimate = $err")
         return integral
     end
@@ -190,7 +190,7 @@ for j = 1:4
     # Define dwP_Ri
     function dwP_Ri(x, mu, Si, zetai)
         P = P_Ri(x, mu, Si, zetai)    
-        P = min(P,1)
+        P = min(P,1-P_eps)
         if abs(P) < 1e-10 #P == 0
             return P = 1e-10 #so we don't get NaN
         end 
@@ -212,7 +212,7 @@ for j = 1:4
     function dwP_1_Ri(Ri, mu, Si, zetai)
         # Compute P using P_Ri
         P = P_Ri(Ri, mu, Si, zetai)
-        P = min(P,1) # capping at one due to round off errors, whereby P = 1.000000001 is set to P = 1
+        P = min(P,1-P_eps) # capping at one due to round off errors, whereby P = 1.000000001 is set to P = 1
 
         if abs(P) < 1e-10 #P == 0
             return P = 1e-10 #so we don't get NaN
@@ -256,88 +256,87 @@ for j = 1:4
         return integral
     end
 
-    # # Define neg_integral in Equation 20
-    # function neg_integral20(θᵢ, mu, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-    #     lower_bound = L_bound
-    #     upper_bound = Rf-theta_i_minus1*g_i/θᵢ
-    #     if θᵢ >= 0
-    #         integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
-    #         lower_bound, upper_bound, rtol=1e-4)
-    #     elseif θᵢ < 0
-    #         integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
-    #         lower_bound, upper_bound, rtol=1e-4)
-    #     end
-    #     #println("neg_integral20: Result = $integral, error estimate = $err")
-    #     return integral
-    # end
-
-    # # Define pos_integral in Equation 20
-    # function pos_integral20(θᵢ, mu, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-    #     lower_bound = Rf-theta_i_minus1*g_i/θᵢ
-    #     upper_bound = U_bound
-    #     if θᵢ >= 0
-    #         integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
-    #         lower_bound, upper_bound, rtol=1e-4)
-    #     elseif θᵢ < 0
-    #         integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
-    #         lower_bound, upper_bound, rtol=1e-4)
-    #     end
-    #     #println("pos_integral20: Result = $integral, error estimate = $err")
-    #     return integral
-    # end
-
-    function neg_integral20(θᵢ, mu, Si, zetai, g_i, theta_i_minus1, lamb, b0)
-        # 1) compute your integration limits
+    # Define neg_integral in Equation 20
+    function neg_integral20(θᵢ, mu, Si, zetai, g_i,theta_i_minus1,lamb, b0)
         lower_bound = L_bound
-        upper_bound = Rf - theta_i_minus1 * g_i / θᵢ
-    
-        # 2) if the interval is empty or flipped, just return 0
-        if upper_bound ≤ lower_bound
-            return 0.0
+        upper_bound = Rf-theta_i_minus1*g_i/θᵢ
+        if θᵢ >= 0
+            integral, err = quadgk(x -> (-lamb * b0 *(θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
+            lower_bound, upper_bound, rtol=1e-4)
+        elseif θᵢ < 0
+            integral, err = quadgk(x -> (b0 *(θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_Ri(x, mu, Si, zetai), 
+            lower_bound, upper_bound, rtol=1e-4)
         end
-    
-        # 3) do the adaptive quadrature, guarding t ≤ 0
-        integral, err = quadgk(x -> begin
-            # the “loss‐domain” tilt
-            t = θᵢ * (Rf - x) - theta_i_minus1 * g_i
-            # <-- floor it here!
-            t = max(t, 1e-8)
-    
-            # now safe to raise to α
-            return b0 * (t^α) * dwP_Ri(x, mu, Si, zetai)
-        end,
-        lower_bound, upper_bound,
-        rtol=1e-5)
-    
+        #println("neg_integral20: Result = $integral, error estimate = $err")
         return integral
     end
-    
-    
-    function pos_integral20(θᵢ, mu, Si, zetai, g_i, theta_i_minus1, lamb, b0)
-        # 1) integration limits
-        lower_bound = Rf - theta_i_minus1 * g_i / θᵢ
+
+    # Define pos_integral in Equation 20
+    function pos_integral20(θᵢ, mu, Si, zetai, g_i,theta_i_minus1,lamb, b0)
+        lower_bound = Rf-theta_i_minus1*g_i/θᵢ
         upper_bound = U_bound
-    
-        # 2) empty or flipped?
-        if upper_bound ≤ lower_bound
-            return 0.0
+        if θᵢ >= 0
+            integral, err = quadgk(x -> (-b0 * (θᵢ * (x-Rf) + theta_i_minus1 * g_i) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
+            lower_bound, upper_bound, rtol=1e-4)
+        elseif θᵢ < 0
+            integral, err = quadgk(x -> (lamb * b0 * (θᵢ * (Rf-x) - theta_i_minus1 * g_i ) ^(α)) * dwP_1_Ri(x, mu, Si, zetai), 
+            lower_bound, upper_bound, rtol=1e-4)
         end
-    
-        # 3) quadrature with the t‐floor
-        integral, err = quadgk(x -> begin
-            # the “gain‐domain” tilt
-            t = θᵢ * (x - Rf) + theta_i_minus1 * g_i
-            # <-- floor it here!
-            t = max(t, 1e-8)
-    
-            # now safe to raise to α
-            return -b0 * (t^α) * dwP_1_Ri(x, mu, Si, zetai)
-        end,
-        lower_bound, upper_bound,
-        rtol=1e-5)
-    
+        #println("pos_integral20: Result = $integral, error estimate = $err")
         return integral
-    end    
+    end
+
+    # ε = 1e-8
+
+    # function neg_integral(mu, Si, zetai, g_i, theta_mi, theta_i_minus1)
+    #     # original limits
+    #     lower = L_bound
+    #     upper = Rf - theta_i_minus1 * g_i / theta_mi
+    
+    #     # if skew is negative, shift upper inward by ε
+    #     if zetai < 0
+    #         upper -= ε
+    #     end
+    
+    #     # # if the region vanishes, zero by definition
+    #     # if upper ≤ lower
+    #     #     return 0.0
+    #     # end
+    
+    #     integral, err = quadgk(x -> begin
+    #         t = theta_mi*(Rf - x) - theta_i_minus1*g_i
+    #         return t^(α-1) * (Rf - x) * dwP_Ri(x, mu, Si, zetai)
+    #     end,
+    #     lower, upper,
+    #     rtol=1e-4)
+    
+    #     return integral
+    # end
+    
+    
+    # function pos_integral(mu, Si, zetai, g_i, theta_mi, theta_i_minus1)
+    #     # original limits
+    #     lower = Rf - theta_i_minus1 * g_i / theta_mi
+    #     upper = U_bound
+    
+    #     # if skew is negative, shift lower inward by ε
+    #     if zetai < 0
+    #         lower += ε
+    #     end
+    
+    #     # if upper ≤ lower
+    #     #     return 0.0
+    #     # end
+    
+    #     integral, err = quadgk(x -> begin
+    #         t = theta_mi*(x - Rf) + theta_i_minus1*g_i
+    #         return t^(α-1) * (x - Rf) * dwP_1_Ri(x, mu, Si, zetai)
+    #     end,
+    #     lower, upper,
+    #     rtol=1e-4)
+    
+    #     return integral
+    # end
 
     # Solve Equation 35 and get μ̂
     function Equation35(mu)
@@ -362,7 +361,12 @@ for j = 1:4
     μ̂[j] = results.zero[1]
     # Equation35(μ̂)
 
-    result2 = optimize(θᵢ  -> Equation20(θᵢ,μ̂[j]), -theta_mi, theta_mi*2)
+
+    lower_bound = (j == 1) ? 0.0 : -theta_mi          #
+    upper_bound = 2*theta_mi                          #
+    result2 = optimize(θᵢ -> Equation20(θᵢ, μ̂[j]),
+                       lower_bound, upper_bound) 
+    #result2 = optimize(θᵢ  -> Equation20(θᵢ,μ̂[j]), -theta_mi, theta_mi*2)
     θ̂ᵢ[j] = Optim.minimizer(result2)[1]
 
     println("$j theta is ", θ̂ᵢ[j])
@@ -435,7 +439,7 @@ for j = 1:4
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.0025,μ̂[j]+0.0025,50)
+        μ_pot = LinRange(μ̂[j]-0.0025,μ̂[j]+0.0025,30)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
