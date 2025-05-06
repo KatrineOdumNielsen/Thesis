@@ -64,11 +64,11 @@ theme(:vibrant)
 
 ## =========== Parameters ============= ##
 nu = 17 #changed
-σm = 0.07 #changed
+σm = 0.08 #changed
 Rf = 1 #unchanged
 
 γ̂, b0 = (2, 0.6) #unchanged
-a = 5 #new parameter
+a = 1 #new parameter
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -101,9 +101,9 @@ x = ones(3,1) #fraction of investors with low holding (only relevant for hetro e
 y = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
-bound = [20,20,2.5]
+bound = [20,20,15]
 
-for j = 1:3
+for j = 3:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]

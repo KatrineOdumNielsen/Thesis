@@ -94,10 +94,10 @@ momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr
 
 ## =========== Our parameters ============= ##
 nu = 17 #changed
-σm = 0.055 #changed
+σm = 0.07 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (2.5, 0.2) #unchanged
+γ̂, b0 = (2, 0.3) #unchanged
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -123,22 +123,15 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 θ̂ᵢ = zeros(3,1)
 exp_exc_ret = zeros(3,1)
 alpha = zeros(3,1)
-utility = zeros(3,1)
-utility_pt_high = zeros(3,1)
-utility_mv_high = zeros(3,1)
-utility_pt_low = zeros(3,1)
-utility_mv_low = zeros(3,1)
-utility_no_investment = zeros(3,1)
 theta_high = zeros(3,1)
 theta_low = zeros(3,1)
 x = ones(3,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
 y = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
-test = zeros(3,1)
 
 ## list for bounds of integrals
 bound = [20,20,15]
 
-for j = 1:3
+for j = 3:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]
@@ -302,7 +295,7 @@ for j = 1:3
         return -(term1 + term2 + term3)
     end
 
-    results = nlsolve(Equation35, [0.1])
+    results = nlsolve(Equation35, [0.9])
     μ̂[j] = results.zero[1]
     # Equation35(μ̂)
 
@@ -337,11 +330,8 @@ for j = 1:3
 
         θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
         u_rand_all = [u_rand_neg; u_rand]
-        test[j] = (u_rand[1] + u_rand_neg[end]) / 2  * -1
 
         # Store utility values
-        utility[j] = Equation20(θ̂ᵢ[j],μ̂[j])  * -1
-        utility_no_investment[j] = 0.5 * Equation20.(0.00001,μ̂[j])  * -1 + 0.5 * Equation20.(-0.00001,μ̂[j])  * -1
         theta_low[j] = θ̂ᵢ[j]
 
         #   Plot graphs
@@ -375,13 +365,11 @@ for j = 1:3
 
             return -(term2 + term3)
         end
-        utility_pt_low[j] = Equation20_PT_homogeneous(θ̂ᵢ[j],μ̂[j]) * -1
-        utility_mv_low[j] = Equation20_MV_homogeneous(θ̂ᵢ[j],μ̂[j]) * -1
 
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.02,μ̂[j]-0.005,75)
+        μ_pot = LinRange(μ̂[j]-0.025,μ̂[j],75)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -423,7 +411,6 @@ for j = 1:3
 
         # Overwrite μ̂[j] with the optimal μ_pot
         μ̂[j] = optimal_mu
-        utility_no_investment[j] = 0.5 * Equation20(0.00005,μ̂[j]) * -1 + 0.5 * Equation20(-0.00005,μ̂[j]) * -1
 
         # Print the updated μ̂[j]
         println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])
@@ -433,8 +420,6 @@ for j = 1:3
         # Extract the corresponding utility_low value
         optimal_utility_low = results_df[index_of_min_u_diff, :utility_low]
 
-        # Set utility[j] equal to the optimal utility_low
-        utility[j] = optimal_utility_low
 
         #Save theta's and holdings
         optimal_theta_low = results_df[index_of_min_u_diff, :opt_theta_low]
@@ -507,71 +492,21 @@ for j = 1:3
         title!("Objective function for portfolio $(j)", titlefontsize=10)
         savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
 
-        utility_pt_low[j] = Equation20_PT(theta_low[j],μ̂[j]) * -1
-        utility_mv_low[j] = Equation20_MV(theta_low[j],μ̂[j]) * -1
-        utility_pt_high[j] = Equation20_PT(theta_high[j],μ̂[j]) * -1
-        utility_mv_high[j] = Equation20_MV(theta_high[j],μ̂[j]) * -1
-
     end
     exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
     println("Done with portfolio $j")
 end
 
-utility_total = utility[1] * 30 + utility[2] * 190 + utility[3] * 780
-
-utility_equal = utility[1] + utility[2] + utility[3]
-
-utility_no_investment_total = utility_no_investment[1] * 30 + utility_no_investment[2] * 190 + utility_no_investment[3] * 780
-
-utility_pt = utility_pt_low[1] * 30 * x[1] + utility_pt_high[1] * 30 * y[1] +
-              utility_pt_low[2] * 190 * x[2] + utility_pt_high[2] * 190 * y[2] +
-              utility_pt_low[3] * 780 * x[3] + utility_pt_high[3] * 780 * y[3]
-
-utility_pt_equal = utility_pt_low[1] * x[1] + utility_pt_high[1] * y[1] +
-              utility_pt_low[2] * x[2] + utility_pt_high[2] * y[2] +
-              utility_pt_low[3] * x[3] + utility_pt_high[3] * y[3]
-
-utility_mv = utility_mv_low[1] * 30 * x[1] + utility_mv_high[1] * 30 * y[1] +
-              utility_mv_low[2] * 190 * x[2] + utility_mv_high[2] * 190 * y[2] +
-              utility_mv_low[3] * 780 * x[3] + utility_mv_high[3] * 780 * y[3]
-
-utility_mv_equal = utility_mv_low[1] * x[1] + utility_mv_high[1] * y[1] +
-              utility_mv_low[2] * x[2] + utility_mv_high[2] * y[2] +
-              utility_mv_low[3] * x[3] + utility_mv_high[3] * y[3]
 market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
 
 alpha = exp_exc_ret - βᵢ_all * market_return
 
-pt_equal_share = utility_pt_equal / utility_equal
-
-pt_total_share = utility_pt / utility_total
-
-mv_incremental_share = utility_mv / (utility_total - utility_no_investment_total)
-
-println("Utility from each asset: $utility")
-println("Utility from each asset with no investment: $utility_no_investment")
-println("test: $test")
 println("Low holding of each asset: $theta_low")
 println("High holding of each asset: $theta_high")
 println("Fraction of investors with low holding: $x")
 println("Fraction of investors with high holding: $y")
-println("Utilty from low holding: $utility_pt_low")
-println("Utilty from high holding: $utility_pt_high")
-println("Utility total: $utility_total")
-println("Utility from prospect theory: $utility_pt")
-println("Utility from mean-variance: $utility_mv")
-println("Utility from no investment: $utility_no_investment_total")
-println("Utility from pt low: $utility_pt_low")
-println("Utility from pt high: $utility_pt_high")
-println("Utility from mv low: $utility_mv_low")
-println("Utility from mv high: $utility_mv_high")
+println("Mu: $μ̂")
 println("Expected excess return: $exp_exc_ret")
 println("Market return: $market_return")
 println("alpha: $alpha")
-print("utility from equal investment: $utility_equal")
-println("utility from pt equal investment: $utility_pt_equal")
-println("utility from mv equal investment: $utility_mv_equal")
-println("pt equal share: $pt_equal_share")
-println("pt total share: $pt_total_share")
-println("mv incremental share: $mv_incremental_share")
 println("Done with code")

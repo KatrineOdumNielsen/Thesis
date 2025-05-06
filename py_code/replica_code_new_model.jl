@@ -68,10 +68,10 @@ Plots.showtheme(:vibrant)
 theme(:vibrant)
 
 #%% Import parameters generated from python part 3a
-momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
-momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
-momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
-momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
+#momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
+#momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
+#momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
+#momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
 
 #%% Set parameters (their parameters)
 #nu = 7.5
@@ -135,7 +135,7 @@ l = ones(3,1) #fraction of investors with low holding (only relevant for hetro e
 h = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
-bound = [20,20,15]
+bound = [20,20,2.5]
 
 for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
@@ -177,7 +177,7 @@ for j = 1:3
     # Define P_Ri
     function P_Ri(x, mu, Si, zetai)
         #println("P_Ri: Computing integral for x = $x, mu = $mu, Si = $Si, zetai = $zetai")
-        integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-6)
+        integral, err = quadgk(Ri -> p_Ri(Ri, mu, Si, zetai), -Inf, x, rtol=1e-7)
         #println("P_Ri: Integral = $integral, error estimate = $err")
         return integral
     end
@@ -379,7 +379,7 @@ for j = 1:3
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.0025,μ̂[j]+0.0025,100)
+        μ_pot = LinRange(μ̂[j]-0.005,μ̂[j]-0.002,100)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
