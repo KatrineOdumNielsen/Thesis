@@ -562,6 +562,9 @@ log_row = DataFrame(
   alpha3         = alpha3
 )
 
+#extract the first row of average_metrics_updated
+first_avg = average_metrics_updated[1:1, :]
+log_row_full = hcat(log_row, first_avg)
 
 # ensure the results directory exists
 results_dir = joinpath(project_folder, "data", "results")
@@ -570,8 +573,9 @@ results_dir = joinpath(project_folder, "data", "results")
 log_file = joinpath(results_dir, "run_log.csv")
 CSV.write(
   log_file,
-  log_row;
+  log_row_full;
   append = isfile(log_file),
+  header = !isfile(log_file)
 )
 
 println("Logged this run to $log_file")
