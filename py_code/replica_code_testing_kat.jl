@@ -10,6 +10,10 @@
 #
 #
 # ======================================================================================================================
+
+run_title = "clean_model_2.5bound" 
+
+
 ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
 ENV["SSL_CERT_FILE"] = ""
 
@@ -21,6 +25,7 @@ using Pkg, Base.Filesystem
 #Pkg.activate(joinpath(pwd(),""))
 #Pkg.instantiate()
 
+#Pkg.add("FileIO")
 #Pkg.add(url="https://github.com/JuliaMPC/NLOptControl.jl")
 #Pkg.add(PackageSpec(name="KNITRO", version="0.5.0"))
 #Pkg.pin("KNITRO")  # This pins the currently resolved version
@@ -97,7 +102,7 @@ nu = 17 #changed
 σm = 0.07 #changed
 Rf = 1 #unchanged
 
-γ̂, b0 = (5, 1) #changed
+γ̂, b0 = (2, 0.3) #unchanged
 α, δ, lamb = (0.7, 0.65, 1.5) #unchanged
 
 Ri = 0.01 #changed
@@ -123,18 +128,13 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 θ̂ᵢ = zeros(3,1)
 exp_exc_ret = zeros(3,1)
 alpha = zeros(3,1)
-utility = zeros(3,1)
-utility_pt_high = zeros(3,1)
-utility_mv_high = zeros(3,1)
-utility_pt_low = zeros(3,1)
-utility_mv_low = zeros(3,1)
 theta_high = zeros(3,1)
 theta_low = zeros(3,1)
 x = ones(3,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
 y = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
-bound = [20,20,15]
+bound = [20,20,2.5]
 
 for j = 1:3
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
@@ -300,7 +300,7 @@ for j = 1:3
         return -(term1 + term2 + term3)
     end
 
-    results = nlsolve(Equation35, [0.1])
+    results = nlsolve(Equation35, [0.9])
     μ̂[j] = results.zero[1]
     # Equation35(μ̂)
 
@@ -313,7 +313,7 @@ for j = 1:3
 
     if abs(θ̂ᵢ[j] - theta_mi) < 0.00001
         println("$j is a homogeneous equilibrium")
-        println("Drawing figure 3 for portfolio $j")
+        #println("Drawing figure 3 for portfolio $j")
 
         ### Draw Figure 3 for portfolio j ###
         function Equation20(θᵢ,μ̂)
@@ -325,34 +325,35 @@ for j = 1:3
             return -(term1 + term2 + term3)
         end
         
-        #θᵢ_rand = LinRange(0.00001,0.002,50)
-        θᵢ_rand = LinRange(0.0001,0.02,100)
-        u_rand = Equation20.(θᵢ_rand,μ̂[j])
+        # #θᵢ_rand = LinRange(0.00001,0.002,50)
+        # θᵢ_rand = LinRange(0.00001,0.005,100)
+        # u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
-        #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-        θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
-        u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
+        # #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
+        # θᵢ_rand_neg = LinRange(-0.0025,-0.00001,100)
+        # u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
-        θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-        u_rand_all = [u_rand_neg; u_rand]
+        # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+        # u_rand_all = [u_rand_neg; u_rand]
 
-        utility[j] = Equation20(θ̂ᵢ[j],μ̂[j])
+        # Store utility values
         theta_low[j] = θ̂ᵢ[j]
 
         #   Plot graphs
         # gr()
         # Plots.GRBackend()
-        pyplot()
-        Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
-        xlabel!("θ₁", xguidefontsize=10)
-        ylabel!("utility", yguidefontsize=10)
-        title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures","Figure3_portfolio_$(j)_testingb0.png"))
+        # pyplot()
+        # Plots.PyPlotBackend()
+        # plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
+        # xlabel!("θ₁", xguidefontsize=10)
+        # ylabel!("utility", yguidefontsize=10)
+        # title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
+        # savefig(joinpath("figures","Figure3_portfolio_$(j).png"))
 
-        println("done with fig 3")
+        # println("done with fig 3")
 
-        function Equation20_MV(θᵢ,μ̂)
+
+        function Equation20_MV_homogeneous(θᵢ,μ̂)
 
             term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
             # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
@@ -361,7 +362,7 @@ for j = 1:3
             return -(term1)
         end
 
-        function Equation20_PT(θᵢ,μ̂)
+        function Equation20_PT_homogeneous(θᵢ,μ̂)
 
             # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
             term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
@@ -369,13 +370,11 @@ for j = 1:3
 
             return -(term2 + term3)
         end
-        utility_pt_low[j] = Equation20_PT(θ̂ᵢ[j],μ̂[j])
-        utility_mv_low[j] = Equation20_MV(θ̂ᵢ[j],μ̂[j])
 
     elseif abs(θ̂ᵢ[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(μ̂[j]-0.025,μ̂[j],30)
+        μ_pot = LinRange(μ̂[j]-0.025,μ̂[j],75)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -395,8 +394,8 @@ for j = 1:3
                 opt_theta_high = Optim.minimizer(result_high)[1]  # Extract the optimal theta for the high range
             
                 # Calculate utilities
-                utility_low = Equation20(opt_theta_low, μ_pot_i)  # Utility for opt_theta_low
-                utility_high = Equation20(opt_theta_high, μ_pot_i)  # Utility for opt_theta_high
+                utility_low = Equation20(opt_theta_low, μ_pot_i) * -1  # Utility for opt_theta_low
+                utility_high = Equation20(opt_theta_high, μ_pot_i) * -1  # Utility for opt_theta_high
             
                 # Calculate the difference between the two utilities
                 utility_diff = abs(utility_low - utility_high)
@@ -419,14 +418,13 @@ for j = 1:3
         μ̂[j] = optimal_mu
 
         # Print the updated μ̂[j]
-        println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])        
-        
+        println("Updated μ̂[$j] with the optimal μ_pot: ", μ̂[j])
+
+                
         # Calculate utility
         # Extract the corresponding utility_low value
         optimal_utility_low = results_df[index_of_min_u_diff, :utility_low]
 
-        # Set utility[j] equal to the optimal utility_low
-        utility[j] = optimal_utility_low
 
         #Save theta's and holdings
         optimal_theta_low = results_df[index_of_min_u_diff, :opt_theta_low]
@@ -440,7 +438,7 @@ for j = 1:3
         println("Row with the lowest u_diff:")
         println(results_df[index_of_min_u_diff, :])
 
-        println("Drawing figure 4 for portfolio $j")
+        #println("Drawing figure 4 for portfolio $j")
         ### Draw Figure 4 for portfolio j ###
         function Equation20(θᵢ,μ̂)
 
@@ -469,79 +467,111 @@ for j = 1:3
             return -(term2 + term3)
         end
         
-        hetro_mu = μ̂[j] #CHANGE - between 0.539 (second utility is too low) and 0.515 (too high)
+        hetro_mu = μ̂[j]
 
-        θᵢ_rand = LinRange(0.0001,1.25,100)
-        u_rand = Equation20.(θᵢ_rand,hetro_mu)
-        MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
-        PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
+        # θᵢ_rand = LinRange(0.0005,0.4,100)
+        # u_rand = Equation20.(θᵢ_rand,hetro_mu)
+        # MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
+        # PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
 
-        θᵢ_rand_neg = LinRange(-0.01,-0.0001,50)
-        u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
-        MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
-        PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
+        # θᵢ_rand_neg = LinRange(-0.1,-0.001,50)
+        # u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
+        # MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
+        # PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
 
-        θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-        u_rand_all = [u_rand_neg; u_rand]
-        MV_rand_all = [MV_rand_neg; MV_rand]
-        PT_rand_all = [PT_rand_neg; PT_rand]
+        # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+        # u_rand_all = [u_rand_neg; u_rand]
+        # MV_rand_all = [MV_rand_neg; MV_rand]
+        # PT_rand_all = [PT_rand_neg; PT_rand]
 
-        #   Plot graphs
-        # gr()
-        # Plots.GRBackend()
-        pyplot()
-        Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.01,1.25), ylims=(-0.003,0.003) ,color=:red, leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.01,0.5), ylims=(-0.003,0.003) ,leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.01,0.5), ylims=(-0.003,0.003) ,leg = false, dpi=300)
-        xlabel!("θ₁", xguidefontsize=10)
-        ylabel!("utility", yguidefontsize=10)
-        title!("Objective function for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures", "Figure4_portfolio_$(j)_testingb0.png"))
-
-        function Equation20_MV(θᵢ,μ̂)
-
-            term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-            # term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-            # term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-
-            return -(term1)
-        end
-
-        function Equation20_PT(θᵢ,μ̂)
-
-            # term1 = θᵢ[1] * (μ̂ + (nu * zetai)/(nu-2) - Rf) - γ̂ / 2 *(θᵢ[1]^2 * σᵢ^2 + 2*θᵢ[1]*(βᵢ*σm^2 - theta_mi * σᵢ^2))
-            term2 =  neg_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-            term3 =  pos_integral20(θᵢ[1], μ̂, Si, zetai, g_i,theta_i_minus1,lamb, b0)
-
-            return -(term2 + term3)
-        end
-        utility_pt_low[j] = Equation20_PT(theta_low[j],μ̂[j])
-        utility_mv_low[j] = Equation20_MV(theta_low[j],μ̂[j])
-        utility_pt_high[j] = Equation20_PT(theta_high[j],μ̂[j])
-        utility_mv_high[j] = Equation20_MV(theta_high[j],μ̂[j])
+        # #   Plot graphs
+        # # gr()
+        # # Plots.GRBackend()
+        # pyplot()
+        # Plots.PyPlotBackend()
+        # plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,color=:red, leg = false, dpi=300)
+        # plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
+        # plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
+        # xlabel!("θ₁", xguidefontsize=10)
+        # ylabel!("utility", yguidefontsize=10)
+        # title!("Objective function for portfolio $(j)", titlefontsize=10)
+        # savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
 
     end
     exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
     println("Done with portfolio $j")
 end
 
-utility_total = utility[1] * 30 + utility[2] * 190 + utility[3] * 780
-
-utility_pt = utility_pt_low[1] * 30 * x[j] + utility_pt_high[1] * 30 * y[j] +
-              utility_pt_low[2] * 190 * x[j] + utility_pt_high[2] * 190 * y[j] +
-              utility_pt_low[3] * 780 * x[j] + utility_pt_high[3] * 780 * y[j]
-
-utility_mv = utility_mv_low[1] * 30 * x[j] + utility_mv_high[1] * 30 * y[j] +
-              utility_mv_low[2] * 190 * x[j] + utility_mv_high[2] * 190 * y[j] +
-              utility_mv_low[3] * 780 * x[j] + utility_mv_high[3] * 780 * y[j]
-
 market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
+
 alpha = exp_exc_ret - βᵢ_all * market_return
-println("Utility total: $utility_total")
-println("Utility from prospect theory: $utility_pt")
-println("Utility from mean-variance: $utility_mv")
+
+println("Low holding of each asset: $theta_low")
+println("High holding of each asset: $theta_high")
+println("Fraction of investors with low holding: $x")
+println("Fraction of investors with high holding: $y")
+println("Mu: $μ̂")
 println("Expected excess return: $exp_exc_ret")
 println("Market return: $market_return")
 println("alpha: $alpha")
 println("Done with code")
+
+### Saving results to csv ###
+using Dates, CSV, DataFrames, FileIO 
+
+# — after everything has been computed —
+timestamp = Dates.now()
+
+# flatten your vectors into scalars for this run
+μ1, μ2, μ3        = μ̂[1],      μ̂[2],      μ̂[3]
+θ1, θ2, θ3        = θ̂ᵢ[1],     θ̂ᵢ[2],     θ̂ᵢ[3]
+exp1, exp2, exp3  = exp_exc_ret[1], exp_exc_ret[2], exp_exc_ret[3]
+mkt_ret           = market_return
+alpha1, alpha2, alpha3 = alpha[1], alpha[2], alpha[3]
+bound_di, bound_hy, bound_ig = bound[1], bound[2], bound[3]
+
+# collect all the parameters you want to track
+log_row = DataFrame(
+  timestamp      = timestamp,
+  run_title      = run_title,
+  nu             = nu,
+  σm             = σm,
+  Rf             = Rf,
+  gamma_hat      = γ̂,
+  b0             = b0,
+  α_param        = α,
+  δ              = δ,
+  lamb           = lamb,
+  Ri             = Ri,
+  mu             = mu,
+  bound_di       = bound_di,
+  bound_hy       = bound_hy,
+  bound_ig       = bound_ig,
+  μ1             = μ1,
+  μ2             = μ2,
+  μ3             = μ3,
+  θ1             = θ1,
+  θ2             = θ2,
+  θ3             = θ3,
+  exp_exc1       = exp1,
+  exp_exc2       = exp2,
+  exp_exc3       = exp3,
+  market_return  = mkt_ret,
+  alpha1         = alpha1,
+  alpha2         = alpha2,
+  alpha3         = alpha3
+)
+
+
+# ensure the results directory exists
+results_dir = joinpath(project_folder, "data", "results")
+
+# append to the CSV in that folder
+log_file = joinpath(results_dir, "run_log.csv")
+CSV.write(
+  log_file,
+  log_row;
+  append = isfile(log_file),
+)
+
+println("Logged this run to $log_file")
