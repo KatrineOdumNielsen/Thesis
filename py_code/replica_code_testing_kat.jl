@@ -11,7 +11,7 @@
 #
 # ======================================================================================================================
 
-run_title = "clean_model_2.5bound" 
+run_title = "clean_model_5" 
 
 
 ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
@@ -72,31 +72,6 @@ using GLPK
 Plots.showtheme(:vibrant)
 theme(:vibrant)
 
-#%% Import parameters generated from python part 3a
-momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
-momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
-momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
-momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
-
-#%% Set parameters (their parameters)
-#nu = 7.5
-#σm = 0.25
-#Rf = 1
-
-# γ̂, b0 = (0.6, 0.6)
-# α, δ, lamb = (0.7, 0.65, 1.5)
-
-# σᵢ_all = momr_std_skew.avg_std
-# βᵢ_all = momr_beta.avg_beta
-# g_i_all = momr_gi.avg_gi
-# Si_all = momr_std_skew.Si
-# xi_all = momr_std_skew.xi
-# theta_mi_all = momr_avg_theta_all.avg_theta_mi ./100
-# theta_i_minus1_all = momr_avg_theta_all.avg_theta_mi ./100
-
-#Ri = 0.01
-#mu = 0.005
-
 ## =========== Our parameters ============= ##
 nu = 17 #changed
 σm = 0.07 #changed
@@ -134,9 +109,9 @@ x = ones(3,1) #fraction of investors with low holding (only relevant for hetro e
 y = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
-bound = [20,20,2.5]
+bound = [20,20,5]
 
-for j = 1:3
+for j = 2:2
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]
@@ -325,32 +300,32 @@ for j = 1:3
             return -(term1 + term2 + term3)
         end
         
-        # #θᵢ_rand = LinRange(0.00001,0.002,50)
-        # θᵢ_rand = LinRange(0.00001,0.005,100)
-        # u_rand = Equation20.(θᵢ_rand,μ̂[j])
+        #θᵢ_rand = LinRange(0.00001,0.002,50)
+        θᵢ_rand = LinRange(0.00001,0.005,100)
+        u_rand = Equation20.(θᵢ_rand,μ̂[j])
 
-        # #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
-        # θᵢ_rand_neg = LinRange(-0.0025,-0.00001,100)
-        # u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
+        #θᵢ_rand_neg = LinRange(-0.001,-0.00001,50)
+        θᵢ_rand_neg = LinRange(-0.0025,-0.00001,100)
+        u_rand_neg = Equation20.(θᵢ_rand_neg,μ̂[j])
 
-        # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-        # u_rand_all = [u_rand_neg; u_rand]
+        θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+        u_rand_all = [u_rand_neg; u_rand]
 
         # Store utility values
         theta_low[j] = θ̂ᵢ[j]
 
         #   Plot graphs
-        # gr()
-        # Plots.GRBackend()
-        # pyplot()
-        # Plots.PyPlotBackend()
-        # plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
-        # xlabel!("θ₁", xguidefontsize=10)
-        # ylabel!("utility", yguidefontsize=10)
-        # title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
-        # savefig(joinpath("figures","Figure3_portfolio_$(j).png"))
+        #gr()
+        #Plots.GRBackend()
+        pyplot()
+        Plots.PyPlotBackend()
+        plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:darkblue, dpi=300, xlims = (-0.0015, 0.003), ylims = (-0.0007, -0.0003))
+        xlabel!("θ₁", xguidefontsize=10)
+        ylabel!("utility", yguidefontsize=10)
+        title!("Objective function for portfolio $(j)", titlefontsize=10)
+        savefig(joinpath("figures","Figure3_portfolio_$(j).png"))
 
-        # println("done with fig 3")
+        println("done with fig 3")
 
 
         function Equation20_MV_homogeneous(θᵢ,μ̂)
@@ -469,33 +444,33 @@ for j = 1:3
         
         hetro_mu = μ̂[j]
 
-        # θᵢ_rand = LinRange(0.0005,0.4,100)
-        # u_rand = Equation20.(θᵢ_rand,hetro_mu)
-        # MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
-        # PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
+        θᵢ_rand = LinRange(0.0005,0.4,100)
+        u_rand = Equation20.(θᵢ_rand,hetro_mu)
+        MV_rand = Equation20_MV.(θᵢ_rand,hetro_mu)
+        PT_rand = Equation20_PT.(θᵢ_rand,hetro_mu)
 
-        # θᵢ_rand_neg = LinRange(-0.1,-0.001,50)
-        # u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
-        # MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
-        # PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
+        θᵢ_rand_neg = LinRange(-0.1,-0.001,50)
+        u_rand_neg = Equation20.(θᵢ_rand_neg,hetro_mu)
+        MV_rand_neg = Equation20_MV.(θᵢ_rand_neg,hetro_mu)
+        PT_rand_neg = Equation20_PT.(θᵢ_rand_neg,hetro_mu)
 
-        # θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
-        # u_rand_all = [u_rand_neg; u_rand]
-        # MV_rand_all = [MV_rand_neg; MV_rand]
-        # PT_rand_all = [PT_rand_neg; PT_rand]
+        θᵢ_rand_all = [θᵢ_rand_neg; θᵢ_rand]
+        u_rand_all = [u_rand_neg; u_rand]
+        MV_rand_all = [MV_rand_neg; MV_rand]
+        PT_rand_all = [PT_rand_neg; PT_rand]
 
-        # #   Plot graphs
-        # # gr()
-        # # Plots.GRBackend()
-        # pyplot()
-        # Plots.PyPlotBackend()
-        # plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,color=:red, leg = false, dpi=300)
-        # plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
-        # plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
-        # xlabel!("θ₁", xguidefontsize=10)
-        # ylabel!("utility", yguidefontsize=10)
-        # title!("Objective function for portfolio $(j)", titlefontsize=10)
-        # savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
+        #   Plot graphs
+        # gr()
+        # Plots.GRBackend()
+        pyplot()
+        Plots.PyPlotBackend()
+        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.04,0.3), ylims=(-0.002,0.0015) ,color=:darkblue, leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.04,0.3), ylims=(-0.002,0.0015) , color=:lightgreen ,leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.04,0.3), ylims=(-0.002,0.0015) , color=:lightseagreen, leg = false, dpi=300)
+        xlabel!("θ₁", xguidefontsize=10)
+        ylabel!("utility", yguidefontsize=10)
+        title!("Objective function for portfolio $(j)", titlefontsize=10)
+        savefig(joinpath("figures", "Figure4_portfolio_$(j).png"))
 
     end
     exp_exc_ret[j] = μ̂[j] + (nu * zetai)/(nu-2) - Rf
@@ -563,19 +538,18 @@ log_row = DataFrame(
 )
 
 #extract the first row of average_metrics_updated
-first_avg = average_metrics_updated[1:1, :]
-log_row_full = hcat(log_row, first_avg)
+# first_avg = average_metrics_updated[1:1, :]
+# log_row_full = hcat(log_row, first_avg)
 
-# ensure the results directory exists
-results_dir = joinpath(project_folder, "data", "results")
+# # ensure the results directory exists
+# results_dir = joinpath(project_folder, "data", "results")
 
-# append to the CSV in that folder
-log_file = joinpath(results_dir, "run_log.csv")
-CSV.write(
-  log_file,
-  log_row_full;
-  append = isfile(log_file),
-  header = !isfile(log_file)
-)
+# # append to the CSV in that folder
+# log_file = joinpath(results_dir, "run_log.csv")
+# CSV.write(
+#   log_file,
+#   log_row_full;
+#   append = isfile(log_file),
+# )
 
-println("Logged this run to $log_file")
+# println("Logged this run to $log_file")
