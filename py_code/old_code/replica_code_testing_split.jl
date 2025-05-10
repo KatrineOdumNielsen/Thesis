@@ -11,8 +11,7 @@
 #
 # ======================================================================================================================
 
-run_title = "clean_model_5" 
-
+run_title = "model_split_cgo" 
 
 ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
 ENV["SSL_CERT_FILE"] = ""
@@ -25,7 +24,6 @@ using Pkg, Base.Filesystem
 #Pkg.activate(joinpath(pwd(),""))
 #Pkg.instantiate()
 
-#Pkg.add("FileIO")
 #Pkg.add(url="https://github.com/JuliaMPC/NLOptControl.jl")
 #Pkg.add(PackageSpec(name="KNITRO", version="0.5.0"))
 #Pkg.pin("KNITRO")  # This pins the currently resolved version
@@ -69,8 +67,36 @@ using DataFrames
 using BlackBoxOptim
 using JuMP, Ipopt
 using GLPK
+using Dates
 Plots.showtheme(:vibrant)
 theme(:vibrant)
+
+start_time = now()  # Record the start time
+
+#%% Import parameters generated from python part 3a
+momr_avg_theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_theta_all.csv")))
+momr_beta = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_beta_all.csv")))
+momr_gi = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_g_i_all.csv")))
+momr_std_skew = DataFrame(CSV.File(joinpath(project_folder, "data", "raw", "momr_avg_std_skew_Si_xi_all.csv")))
+
+#%% Set parameters (their parameters)
+#nu = 7.5
+#σm = 0.25
+#Rf = 1
+
+# γ̂, b0 = (0.6, 0.6)
+# α, δ, lamb = (0.7, 0.65, 1.5)
+
+# σᵢ_all = momr_std_skew.avg_std
+# βᵢ_all = momr_beta.avg_beta
+# g_i_all = momr_gi.avg_gi
+# Si_all = momr_std_skew.Si
+# xi_all = momr_std_skew.xi
+# theta_mi_all = momr_avg_theta_all.avg_theta_mi ./100
+# theta_i_minus1_all = momr_avg_theta_all.avg_theta_mi ./100
+
+#Ri = 0.01
+#mu = 0.005
 
 ## =========== Our parameters ============= ##
 nu = 17 #changed
@@ -83,8 +109,8 @@ Rf = 1 #unchanged
 Ri = 0.01 #changed
 mu = 0.005 #changed
 
-theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
-average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
+theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df_split.csv")))
+average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_split_updated.csv")))
 
 σᵢ_all = average_metrics_updated.volatility
 βᵢ_all = average_metrics_updated.beta
@@ -99,19 +125,19 @@ theta_i_minus1_all = theta_all.theta_i_minus1
 #%% Calculate μ̂ and θ̂ᵢ
 # μ̂ = zeros(10,1)
 # θ̂ᵢ = zeros(10,1)
-μ̂ = zeros(3,1)
-θ̂ᵢ = zeros(3,1)
-exp_exc_ret = zeros(3,1)
-alpha = zeros(3,1)
-theta_high = zeros(3,1)
-theta_low = zeros(3,1)
-x = ones(3,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
-y = zeros(3,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
+μ̂ = zeros(4,1)
+θ̂ᵢ = zeros(4,1)
+exp_exc_ret = zeros(4,1)
+alpha = zeros(4,1)
+theta_high = zeros(4,1)
+theta_low = zeros(4,1)
+x = ones(4,1) #fraction of investors with low holding (only relevant for hetro equilibrium)
+y = zeros(4,1) #fraction of investors with high holding (only relevant for hetro equilibrium)
 
 ## list for bounds of integrals
-bound = [20,20,5]
+bound = [20,20,20,2.5]
 
-for j = 2:2
+for j = 1:4
     println("I am calculating μ̂ and θ̂ᵢ for portfolio ",j)
 
     L_bound = -bound[j]
@@ -288,7 +314,7 @@ for j = 2:2
 
     if abs(θ̂ᵢ[j] - theta_mi) < 0.00001
         println("$j is a homogeneous equilibrium")
-        #println("Drawing figure 3 for portfolio $j")
+        println("Drawing figure 3 for portfolio $j")
 
         ### Draw Figure 3 for portfolio j ###
         function Equation20(θᵢ,μ̂)
@@ -315,14 +341,14 @@ for j = 2:2
         theta_low[j] = θ̂ᵢ[j]
 
         #   Plot graphs
-        #gr()
-        #Plots.GRBackend()
+        # gr()
+        # Plots.GRBackend()
         pyplot()
         Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:darkblue, dpi=300, xlims = (-0.0015, 0.003), ylims = (-0.0007, -0.0003))
+        plot(θᵢ_rand_all, -u_rand_all, w=3, leg = false, color=:blues, dpi=300)
         xlabel!("θ₁", xguidefontsize=10)
         ylabel!("utility", yguidefontsize=10)
-        title!("Objective function for portfolio $(j)", titlefontsize=10)
+        title!("Objective function of Equation 20 for portfolio $(j)", titlefontsize=10)
         savefig(joinpath("figures","Figure3_portfolio_$(j).png"))
 
         println("done with fig 3")
@@ -413,7 +439,7 @@ for j = 2:2
         println("Row with the lowest u_diff:")
         println(results_df[index_of_min_u_diff, :])
 
-        #println("Drawing figure 4 for portfolio $j")
+        println("Drawing figure 4 for portfolio $j")
         ### Draw Figure 4 for portfolio j ###
         function Equation20(θᵢ,μ̂)
 
@@ -464,9 +490,9 @@ for j = 2:2
         # Plots.GRBackend()
         pyplot()
         Plots.PyPlotBackend()
-        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.04,0.3), ylims=(-0.002,0.0015) ,color=:darkblue, leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.04,0.3), ylims=(-0.002,0.0015) , color=:lightgreen ,leg = false, dpi=300)
-        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.04,0.3), ylims=(-0.002,0.0015) , color=:lightseagreen, leg = false, dpi=300)
+        plot(θᵢ_rand_all, -u_rand_all, w=2,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,color=:red, leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
+        plot!(θᵢ_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.1,0.4), ylims=(-0.004,0.002) ,leg = false, dpi=300)
         xlabel!("θ₁", xguidefontsize=10)
         ylabel!("utility", yguidefontsize=10)
         title!("Objective function for portfolio $(j)", titlefontsize=10)
@@ -477,7 +503,7 @@ for j = 2:2
     println("Done with portfolio $j")
 end
 
-market_return = theta_mi_all[1] * 30 * exp_exc_ret[1] + theta_mi_all[2] * 190 * exp_exc_ret[2] + theta_mi_all[3] * 780 * exp_exc_ret[3]
+market_return = theta_mi_all[1] * 20 * exp_exc_ret[1] + theta_mi_all[2] * 20 * exp_exc_ret[2] + theta_mi_all[3] * 180 * exp_exc_ret[3] + theta_mi_all[4] * 780 * exp_exc_ret[4]
 
 alpha = exp_exc_ret - βᵢ_all * market_return
 
@@ -490,6 +516,10 @@ println("Expected excess return: $exp_exc_ret")
 println("Market return: $market_return")
 println("alpha: $alpha")
 println("Done with code")
+
+end_time = now()  # Record the end time
+elapsed_time = end_time - start_time  # Calculate the elapsed time
+println("Total execution time: $elapsed_time")
 
 ### Saving results to csv ###
 using Dates, CSV, DataFrames, FileIO 
@@ -538,11 +568,11 @@ log_row = DataFrame(
 )
 
 #extract the first row of average_metrics_updated
-# first_avg = average_metrics_updated[1:1, :]
-# log_row_full = hcat(log_row, first_avg)
+first_avg = average_metrics_updated[1:1, :]
+log_row_full = hcat(log_row, first_avg)
 
-# # ensure the results directory exists
-# results_dir = joinpath(project_folder, "data", "results")
+# ensure the results directory exists
+results_dir = joinpath(project_folder, "data", "results")
 
 # append to the CSV in that folder
 log_file = joinpath(results_dir, "run_log.csv")
