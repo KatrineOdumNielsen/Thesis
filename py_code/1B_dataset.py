@@ -1,3 +1,16 @@
+# =============================================================================
+#
+#                     Part 1B: Creating the datasets
+#
+#        (Creates the datasets for the clean dataset (2002-2021), large 
+#            dataset using WRDS data (2002-2024), and larger dataset 
+#                   using WARGA and WRDS data (1973-2024)*)
+#
+#           *Note: WARGA data is only available from 1973-1997, so 
+#        the larger dataset excudes data on bonds between 1997-2002.
+#
+# =============================================================================
+
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,6 +24,7 @@ from datetime import datetime
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
 
+# ================  Loading the necessary data  ================
 # Load yield curve data (monthly)
 series_ids = {
     '1M': 'DGS1MO',   # 1 Month
@@ -46,8 +60,8 @@ bond_return_data.rename(columns={'1M': 't_bill_1'}, inplace=True) # rename for c
 bond_return_data['ret'] = bond_return_data['ret_exc'] + (1 + bond_return_data['t_bill_1']) ** (1/12) - 1 # calculate total return
 
 #printing min and max dates
-print("min date: ", bond_return_data['eom'].min())
-print("max date: ", bond_return_data['eom'].max())
+# print("min date: ", bond_return_data['eom'].min())
+# print("max date: ", bond_return_data['eom'].max())
 
 # Load WRDS data
 wrds_data = pd.read_csv(data_folder + "/raw/all_wrds_data.csv")
@@ -77,7 +91,7 @@ bond_additional_data = wrds_data[wrds_data['eom'] > "2021-11-30"]
 bond_additional_data_subset = bond_additional_data[columns_to_keep_descriptive]
 bond_additional_data_subset = bond_additional_data_subset.merge(
     yield_curve[['1M']], left_on='eom', right_index=True, how='left'
-) # adds yield data
+)
 bond_additional_data_subset.rename(columns={'1M': 't_bill_1'}, inplace=True) # rename for clarity
 bond_additional_data_subset['yield'] = bond_additional_data_subset['wrds_yield']
 bond_additional_data_subset['ret'] = bond_additional_data_subset['ret_eom']
@@ -90,11 +104,13 @@ bond_additional_data_subset = bond_additional_data_subset[bond_data.columns]
 print("adding data")
 bond_data_large = pd.concat([bond_data, bond_additional_data_subset], ignore_index=True)
 
+# ================  Adding credit spread to the dataset  ================
 # Adding credit spread to the data. First, define a function that can interpolate the yield curve.
 yield_curve.columns = [
     float(col[:-1]) / 12 if col.endswith("M") else float(col[:-1]) 
     for col in yield_curve.columns
-] # convert column names to years
+]
+
 def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
     """
     Get interpolated Treasury yield for a given maturity on a specific date.
@@ -107,17 +123,11 @@ def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
     Returns:
     - Interpolated yield for the given date and maturity.
     """
-    # Ensure target_date is a Timestamp
     target_date = pd.Timestamp(target_date)
-
-    # Check if the date exists
     if target_date not in all_treasury_yields.index:
         raise ValueError(f"Date {target_date} not found in dataset")
-
-    # Extract the row for the given date
     yield_curve = all_treasury_yields.loc[target_date]
 
-    # Get available maturities from column names
     maturities = np.array(yield_curve.index.astype(float)) 
     yields = yield_curve.values  # Corresponding yields
 
@@ -125,6 +135,7 @@ def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
     interpolated_yield = np.interp(target_maturity, maturities, yields)
 
     return interpolated_yield
+
 # Calculate credit spread for each bond (doing this on both datasets)
 print("working on credit spread")
 bond_data_large["interp_yield"] = bond_data_large.apply(
@@ -133,6 +144,7 @@ bond_data_large["interp_yield"] = bond_data_large.apply(
 )
 bond_data_large["credit_spread"] = bond_data_large['yield'] - bond_data_large['interp_yield']
 
+# ================  Fixing small adjustments and cleaning the dataset ================
 # Adding rating, group and price data from last period
 rating_data = wrds_data[['eom', 'cusip', 'rating_num', 'rating_class', 'price_eom']]
 rating_data = rating_data.sort_values(by=['cusip', 'eom'])
@@ -144,22 +156,15 @@ rating_data['price_eom_start'] = rating_data.groupby('cusip')['price_eom'].shift
 bond_data_large = pd.merge(bond_data_large, rating_data[['cusip', 'eom', 'rating_num_start', 'rating_class_start', 'price_eom_start']], on=['cusip', 'eom'], how='left')
 
 #Adding credit spread from last period (large dataset)
-# Ensure data is sorted
 bond_data_large["eom"] = pd.to_datetime(bond_data_large["eom"])
 bond_data_large = bond_data_large.sort_values(["cusip", "eom"])
-# Compute last day of the prior month
 bond_data_large["prior_eom"] = (bond_data_large["eom"] - pd.DateOffset(months=1)).dt.to_period("M").dt.to_timestamp(how="end")
-# Create the new column as a string combining prior date and current cusip
 bond_data_large["prior_date_cusip"] = bond_data_large["prior_eom"].dt.strftime("%Y-%m-%d") + "_" + bond_data_large["cusip"]
 bond_data_large["current_date_cusip"] = bond_data_large["eom"].dt.strftime("%Y-%m-%d") + "_" + bond_data_large["cusip"]
 bond_data_large["prior_date_cusip_shift"] = bond_data_large["current_date_cusip"].shift(1)
-# Create the dummy variable equal to 1 if the prior observations is from last month and on the same cusip
 bond_data_large["dummy_prior_match"] = (bond_data_large["prior_date_cusip_shift"] == bond_data_large["prior_date_cusip"]).astype(int)
-# Shift the 'credit_spread' column by 1 and store it in 'credit_spread_prior'
 bond_data_large['credit_spread_start'] = bond_data_large['credit_spread'].shift(1)
-# Remove observations where the prior observations was not the same cusip one month before
 bond_data_large.loc[bond_data_large['dummy_prior_match'] == 0, 'credit_spread_start'] = np.nan
-# Drop help columns
 bond_data_large = bond_data_large.drop(columns=['dummy_prior_match', 'prior_date_cusip_shift', 'prior_date_cusip', 'current_date_cusip'])
 
 # Adding market value of last period
@@ -184,6 +189,7 @@ bond_data_large['distressed_rating_start'] = bond_data_large['rating_num_start']
 bond_data_large['distressed_spread'] = bond_data_large['credit_spread'] > 0.1
 bond_data_large['distressed_spread_start'] = bond_data_large['credit_spread_start'] > 0.1
 
+# ================ Finalizing the datasets ================
 # Finalizing the bond_data dataset
 bond_data = bond_data_large[bond_data_large['eom'] <= '2021-11-30']
 
@@ -207,6 +213,7 @@ new_order = ['eom', 'cusip', 'market_value', 'ret_exc','ret_texc','yield',
                                    'distressed_rating_start','distressed_spread','distressed_spread_start']
 bond_data_large_warga = bond_data_large_warga[new_order]
 
+# ================  Calculating CGO in order to split the dataset on CGO  ================
 #Calculating capital gain overhang for bond_data
 cap_gain_data = wrds_data[['eom', 'cusip', 'price_eom', 'offering_date']]
 print("Calculating capital gain overhang (CGO)...")
@@ -283,7 +290,7 @@ bond_data = pd.merge(
     how='left'
 )
 
-# Save the data
+# ================  Save the data  ================
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
 bond_data_large_warga.to_csv("data/preprocessed/bond_data_large_warga.csv")

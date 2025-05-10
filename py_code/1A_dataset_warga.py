@@ -1,3 +1,11 @@
+# =============================================================================
+#
+#                     Part 1A: Creating the datasets
+#
+#         (Creates the dataset for the WARGA bonds only (1973-1997))
+#
+# =============================================================================
+
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,23 +14,24 @@ import numpy as np
 from fredapi import Fred
 fred = Fred(api_key='01b2825140d39531d70a035eaf06853d')
 
-#Set the working directory
-project_dir = os.getcwd()   # Change to your project directory
+# Setting the working directory
+project_dir = os.getcwd()
 data_folder = project_dir + "/data"
 
-# Load yield curve data (monthly)
+# ================  Loading the necessary data  ================
+# Loading yield curve data (monthly)
 series_ids = {
     #'1M': 'DGS1MO',   # 1 Month
     #'3M': 'DGS3MO',   # 3 Month
     #'6M': 'DGS6MO',   # 6 Month
-    '1Y': 'DGS1',     # 1 Year
-    '2Y': 'DGS2',     # 2 Year
-    '3Y': 'DGS3',     # 3 Year
-    '5Y': 'DGS5',     # 5 Year
-    '7Y': 'DGS7',     # 7 Year
-    '10Y': 'DGS10',   # 10 Year
-    '20Y': 'DGS20',   # 20 Year
-    '30Y': 'DGS30'    # 30 Year
+    '1Y': 'DGS1',      # 1 Year
+    '2Y': 'DGS2',      # 2 Year
+    '3Y': 'DGS3',      # 3 Year
+    '5Y': 'DGS5',      # 5 Year
+    '7Y': 'DGS7',      # 7 Year
+    '10Y': 'DGS10',    # 10 Year
+    '20Y': 'DGS20',    # 20 Year
+    '30Y': 'DGS30'     # 30 Year
 }
 yield_data = {name: fred.get_series(series) for name, series in series_ids.items()}
 yield_curve = pd.DataFrame(yield_data)
@@ -35,12 +44,14 @@ yield_curve.ffill(inplace=True)
 yield_curve = yield_curve[yield_curve.index.is_month_end]
 yield_curve = yield_curve / 100 # convert to decimal
 
-# Load WARGA data
+# Loading WARGA data
 bond_warga_data = pd.read_csv(data_folder + "/raw/warga_full.csv")
 bond_warga_data['yymmdd'] = pd.to_datetime(bond_warga_data['yymmdd'])
-max_date_str = pd.Timestamp.max.normalize().strftime('%Y-%m-%d') #(this will be '2262-04-11', the upper bound of datetime64[ns])
+max_date_str = pd.Timestamp.max.normalize().strftime('%Y-%m-%d') # This will be '2262-04-11', which the upper bound of datetime64[ns]
 mask = bond_warga_data['matdate'] > max_date_str
-bond_warga_data.loc[mask, 'matdate'] = max_date_str
+bond_warga_data.loc[mask, 'matdate'] = max_date_str # Limit the max date to '2262-04-11', to avoid overflow
+
+# Calculating missing parameters and constructing the dataset
 bond_warga_data['matdate'] = pd.to_datetime(bond_warga_data['matdate'])
 bond_warga_data['iss_date'] = pd.to_datetime(bond_warga_data['issdate'])
 bond_warga_data['tmt'] = (bond_warga_data['matdate'] - bond_warga_data['yymmdd']).dt.days / 365
@@ -49,7 +60,7 @@ id = bond_warga_data['iss_date'].values.astype('datetime64[D]')
 bond_warga_data['maturity_years'] = (md - id).astype('timedelta64[D]') / 365
 bond_warga_data['rating_num'] = (bond_warga_data['moodys']+bond_warga_data['snp'])/2
 bond_warga_data['rating_class'] = bond_warga_data['rating_num'].apply(lambda x: '0.IG' if x <= 10.5 else '1.HY')
-bond_warga_data['market_value'] = bond_warga_data['amtout'] * bond_warga_data['flat1'] * 10 # MV is NOT in '000s
+bond_warga_data['market_value'] = bond_warga_data['amtout'] * bond_warga_data['flat1'] * 10 # MV is not in '000s
 bond_warga_data['size'] = bond_warga_data['amtout']
 bond_warga_data.rename(columns={'cusip9': 'cusip', 'yymmdd': 'eom', 'yld1': 'warga_yield', 'amtout' : 'amount_outstanding',
                                 'ret1':'ret_eom','issdate':'offering_date', 'flat1':'price_eom'}, inplace=True)
@@ -72,15 +83,17 @@ bond_warga_data['ret_exc'] = (bond_warga_data['ret']
     - ((1 + bond_warga_data['t_bill_1']) ** (1/12) - 1))
 bond_warga_data['ret_texc'] = bond_warga_data['ret_exc']
 
-#printing min and max dates
-print("min date: ", bond_warga_data['eom'].min())
-print("max date: ", bond_warga_data['eom'].max())
+# Printing min and max dates for overview
+# print("min date: ", bond_warga_data['eom'].min())
+# print("max date: ", bond_warga_data['eom'].max())
 
+# ================  Adding credit spread to the dataset  ================
 # Adding credit spread to the data. First, define a function that can interpolate the yield curve.
 yield_curve.columns = [
     float(col[:-1]) / 12 if col.endswith("M") else float(col[:-1]) 
     for col in yield_curve.columns
-] # convert column names to years
+]
+
 def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
     """
     Get interpolated Treasury yield for a given maturity on a specific date.
@@ -93,17 +106,11 @@ def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
     Returns:
     - Interpolated yield for the given date and maturity.
     """
-    # Ensure target_date is a Timestamp
     target_date = pd.Timestamp(target_date)
-
-    # Check if the date exists
     if target_date not in all_treasury_yields.index:
         raise ValueError(f"Date {target_date} not found in dataset")
-
-    # Extract the row for the given date
     yield_curve = all_treasury_yields.loc[target_date]
 
-    # Get available maturities from column names
     maturities = np.array(yield_curve.index.astype(float)) 
     yields = yield_curve.values  # Corresponding yields
 
@@ -112,10 +119,9 @@ def get_interpolated_yield(all_treasury_yields, target_date, target_maturity):
 
     # Perform linear interpolation
     interpolated_yield = np.interp(target_maturity, maturities, yields)
-
     return interpolated_yield
 
-# Calculate credit spread for each bond (doing this on both datasets)
+# Calculating credit spread for each bond
 print("working on credit spread")
 bond_warga_data["interp_yield"] = bond_warga_data.apply(
     lambda row: get_interpolated_yield(yield_curve, row["eom"], row["tmt"]),
@@ -123,6 +129,7 @@ bond_warga_data["interp_yield"] = bond_warga_data.apply(
 )
 bond_warga_data["credit_spread"] = bond_warga_data['warga_yield'] - bond_warga_data['interp_yield']
 
+# ================  Fixing small adjustments and cleaning the dataset ================
 # Adding rating, group and price data from last period
 rating_data = bond_warga_data[['eom', 'cusip', 'rating_num', 'rating_class', 'price_eom']]
 rating_data = rating_data.sort_values(by=['cusip', 'eom'])
@@ -130,26 +137,19 @@ rating_data['rating_num_start'] = rating_data.groupby('cusip')['rating_num'].shi
 rating_data['rating_class_start'] = rating_data.groupby('cusip')['rating_class'].shift(1)
 rating_data['price_eom_start'] = rating_data.groupby('cusip')['price_eom'].shift(1)
 
-# Merge the rating_data onto bond_data and bond_warga_data
+# Merge the rating_data onto bond_warga_data
 bond_warga_data = pd.merge(bond_warga_data, rating_data[['cusip', 'eom', 'rating_num_start', 'rating_class_start', 'price_eom_start']], on=['cusip', 'eom'], how='left')
 
-#Adding credit spread from last period (large dataset)
-# Ensure data is sorted
+#Adding credit spread from last period
 bond_warga_data["eom"] = pd.to_datetime(bond_warga_data["eom"])
 bond_warga_data = bond_warga_data.sort_values(["cusip", "eom"])
-# Compute last day of the prior month
 bond_warga_data["prior_eom"] = (bond_warga_data["eom"] - pd.DateOffset(months=1)).dt.to_period("M").dt.to_timestamp(how="end")
-# Create the new column as a string combining prior date and current cusip
 bond_warga_data["prior_date_cusip"] = bond_warga_data["prior_eom"].dt.strftime("%Y-%m-%d") + "_" + bond_warga_data["cusip"]
 bond_warga_data["current_date_cusip"] = bond_warga_data["eom"].dt.strftime("%Y-%m-%d") + "_" + bond_warga_data["cusip"]
 bond_warga_data["prior_date_cusip_shift"] = bond_warga_data["current_date_cusip"].shift(1)
-# Create the dummy variable equal to 1 if the prior observations is from last month and on the same cusip
 bond_warga_data["dummy_prior_match"] = (bond_warga_data["prior_date_cusip_shift"] == bond_warga_data["prior_date_cusip"]).astype(int)
-# Shift the 'credit_spread' column by 1 and store it in 'credit_spread_prior'
 bond_warga_data['credit_spread_start'] = bond_warga_data['credit_spread'].shift(1)
-# Remove observations where the prior observations was not the same cusip one month before
 bond_warga_data.loc[bond_warga_data['dummy_prior_match'] == 0, 'credit_spread_start'] = np.nan
-# Drop help columns
 bond_warga_data = bond_warga_data.drop(columns=['dummy_prior_match', 'prior_date_cusip_shift', 'prior_date_cusip', 'current_date_cusip'])
 
 # Adding market value of last period
@@ -184,7 +184,7 @@ new_order = ['eom', 'cusip', 'market_value', 'ret_exc','ret_texc',
                                    'distressed_rating_start','distressed_spread','distressed_spread_start']
 bond_warga_data = bond_warga_data[new_order]
 
-# Save the data
+# ================  Save the data  ================
 bond_warga_data.to_csv("data/preprocessed/bond_warga_data.csv")
 
 print("done")

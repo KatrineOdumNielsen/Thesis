@@ -1,12 +1,11 @@
 # =============================================================================
 #
-#                     Part X: Model Setup A
-#                   (Beta and Capital Gain overhang)
+#                         Part 3B: Model Setup
+#    (Calculating Beta, Capital Gain overhang, volatility, and skewness)
 #
-#         (Considers only subset including the cleaned data)
+#              (Considers only subset including Warga data)
 #
 # =============================================================================
-# Importing necessary libraries
 import pandas as pd
 import numpy as np
 import os
@@ -18,15 +17,16 @@ from scipy.stats import skew
 from datetime import datetime
 
 #Set up working directory
-project_dir = os.getcwd()   # Change to your project directory
+project_dir = os.getcwd()
 data_folder = project_dir + "/data"
 figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
-bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
+bond_data = pd.read_csv(data_folder + "/preprocessed/bond_warga_data.csv")
+model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
+
 
 # ===================================================================    
 #                     a. Set up portfolios by month        
@@ -50,31 +50,28 @@ model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
-model_data.to_csv("data/preprocessed/model_data.csv")
 print("Done setting up portfolios")
 
 # print("Portfolio counts:")
 # print(model_data['portfolio'].value_counts())
 
 # ===================================================================    
-#             b. Calculate monthly portfolio weighted returns        
+#           b. Calculate monthly portfolio weighted returns*
+#      *Note: We use ret_exc (excess return) rather than ret_texc        
 # ===================================================================
-### Calculating returns for portfolios
+# Calculating returns for portfolios
 groups = model_data['portfolio'].dropna().unique().tolist()
 
 # Initialize storage for returns
 group_returns = {grp: [] for grp in groups}
 market_returns = []
 date_series = []
-
-# Get list of unique month-end dates
 dates = sorted(model_data['eom'].dropna().unique())
 
 # Loop through each month
 for dt in dates:
     current_period = model_data[model_data['eom'] == dt]
 
-    # Skip if no data
     if current_period.empty:
         continue
 
@@ -87,33 +84,30 @@ for dt in dates:
 
         if len(group_data) > 0 and total_mv > 0:
             weights = group_data['market_value_start'] / total_mv
-            weighted_return = (weights * group_data['ret_texc']).sum()
+            weighted_return = (weights * group_data['ret_exc']).sum()
         else:
             weighted_return = 0
 
         group_returns[grp].append(weighted_return)
 
-    # Total market return across all portfolios (optional, but common)
+    # Total market return across all portfolios
     total_mv_all = current_period['market_value_start'].sum()
     if total_mv_all > 0:
         weights_all = current_period['market_value_start'] / total_mv_all
-        weighted_return_all = (weights_all * current_period['ret_texc']).sum()
+        weighted_return_all = (weights_all * current_period['ret_exc']).sum()
     else:
         weighted_return_all = 0
     market_returns.append(weighted_return_all)
 
-# 2. Create DataFrames for Returns
 # Create a DataFrame for monthly returns using the computed lists.
 returns_df = pd.DataFrame(group_returns, index=date_series)  
 returns_df['market'] = market_returns
 returns_df.index.name = 'date'
 returns_df = returns_df.sort_index()
 returns_df.index = pd.to_datetime(returns_df.index)
-
-# Reset index so 'date' becomes a column
 returns_df_reset = returns_df.reset_index()
 
-# Melt the DataFrame to long format for the portfolios (excluding 'market')
+# Change the DataFrame to long format for the portfolios (excluding 'market') and merge with market returns
 long_returns = returns_df_reset.melt(
     id_vars='date',
     value_vars=['IG', 'HY', 'DI'],
@@ -121,14 +115,11 @@ long_returns = returns_df_reset.melt(
     value_name='weighted_return'
 )
 
-# Merge the market return onto the long dataframe
 long_returns['market_return'] = long_returns['date'].map(
     returns_df['market']
 )
 
 long_returns = long_returns.sort_values(['date', 'portfolio']).reset_index(drop=True)
-
-# Set portfolio as a categorical with custom order
 long_returns['portfolio'] = pd.Categorical(
     long_returns['portfolio'],
     categories=['DI', 'HY', 'IG'],
@@ -143,6 +134,7 @@ monthly_port_ret_long = long_returns.iloc[:, :3]
 market_return_df = long_returns[['eom', 'market_return']]
 
 print("Done calculating monthly market weighted returns.")
+
 # ===================================================================    
 #           d.   Compute rolling betas for each portfolio        
 # ===================================================================  
@@ -164,7 +156,7 @@ def compute_beta(window_df, min_months=12):
 # Loop over each portfolio and each month to calculate beta
 beta_records = []
 returns_merged = returns_merged.sort_values('eom')
-for portfolio in returns_merged['portfolio'].unique(): # Loop over each portfolio separately.
+for portfolio in returns_merged['portfolio'].unique():
     df_port = returns_merged[returns_merged['portfolio'] == portfolio].copy().sort_values('eom').reset_index(drop=True)
     for i, current_date in enumerate(df_port['eom']):
         if i < 12:     # Skip the first 12 months (no full 12-month history available).
@@ -183,27 +175,27 @@ for portfolio in returns_merged['portfolio'].unique(): # Loop over each portfoli
         })
 
 beta_df = pd.DataFrame(beta_records)
-print("Rolling Beta DataFrame (variable window up to 60 months):")
-print(beta_df)
+# print("Rolling Beta DataFrame (variable window up to 60 months):")
+# print(beta_df)
 
 print("Done calculating rolling betas")
 
-# --- Plot the Rolling Betas for Each Portfolio ---
-cmap = cm.get_cmap('GnBu', 5).reversed()
+# Plot the Rolling Betas for Each Portfolio
+# cmap = cm.get_cmap('GnBu', 5).reversed()
 
-plt.figure(figsize=(10, 6))
-for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
-    sub_df = beta_df[beta_df['portfolio'] == portfolio]
-    plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
-plt.xlabel("End-of-Month (eom)")
-plt.ylabel("Rolling Beta")
-plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
-plt.legend()
-plt.xticks(rotation=45)
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
-plt.close()
+# plt.figure(figsize=(10, 6))
+# for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
+#     sub_df = beta_df[beta_df['portfolio'] == portfolio]
+#     plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
+# plt.xlabel("End-of-Month (eom)")
+# plt.ylabel("Rolling Beta")
+# plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
+# plt.legend()
+# plt.xticks(rotation=45)
+# plt.grid(True)
+# plt.tight_layout()
+# plt.savefig(figures_folder + "/rolling_beta_by_portfolio_warga.png")
+# plt.close()
 
 # ===================================================================    
 #           e.  Calculate capital gain overhang  (CGO)      
@@ -236,20 +228,17 @@ def compute_effective_purchase_price_exponential(group):
         n = i  # number of past observations
         p = monthly_turnover
         
-        # Create an array of length n for the weights
         # k=0 => earliest date
         # k=1..n-1 => subsequent dates
         weights = np.zeros(n)
         
-        # earliest date gets (1 - p)^(n-1)
+        # earliest date
         weights[0] = (1 - p)**(n - 1)
         
-        # for k in [1..n-1], w_k = p * (1 - p)^(n-1 - k)
+        # subsequent dates: for k in [1..n-1], w_k = p * (1 - p)^(n-1 - k)
         for k in range(1, n):
             weights[k] = p * (1 - p)**(n - 1 - k)
         
-        # The i-th row in group corresponds to the 'current' date
-        # The 'past_prices' are the prices from index 0..(i-1)
         past_prices = group.iloc[:i]['price_eom'].values
 
          # Apply the condition to adjust price_eom for k=0
@@ -260,7 +249,7 @@ def compute_effective_purchase_price_exponential(group):
         effective_price = np.sum(weights * past_prices)
         effective_prices.append(effective_price)
         
-        # Current price is the price at row i
+        # Calculate capital gain overhang (CGO)
         current_price = group.iloc[i]['price_eom']
         cgo = (current_price / effective_price - 1) * 100
         cgo_values.append(cgo)
@@ -272,26 +261,24 @@ def compute_effective_purchase_price_exponential(group):
 print('Applying the function group-wise by bond (cusip) ...')
 model_data = model_data.sort_values(['cusip', 'eom'])
 model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_exponential).reset_index(drop=True)
-model_data.to_csv("data/preprocessed/model_data_cgo.csv")
-model_data.to_csv(os.path.join(data_folder + "/preprocessed/model_data_cgo.csv"), index=False)
 
 # Aggregate CGO at portfolio level, first monthly then yearly
 monthly_cgo = (
     model_data.groupby(['eom', 'portfolio'])['cap_gain_overhang']
-    .median() # Use median rather than mean, maybe change
+    .median() 
     .reset_index()
 )
 
 print("Done calculating capital gain overhang (CGO).")
 
 # =============================================================================
-#               f. Calculate volatility and skewness 
+#               f. Calculate volatility and skewness (using ret_exc)
 # =============================================================================
 print("Calculating volatility and skewness...")
 model_data = model_data.sort_values(['cusip', 'eom'])
 
-model_data['ret_texc'] = model_data['ret_texc']
-model_data['log_texc'] = np.log(1 + model_data['ret_texc'])
+# model_data['ret_texc'] = model_data['ret_exc']
+model_data['log_texc'] = np.log(1 + model_data['ret_exc'])
 
 def compute_annual_return(bond_df):
     """
@@ -325,10 +312,7 @@ for port in portfolios:
     vol_skew['portfolio'] = port
     vol_skew_list.append(vol_skew)
 
-final_vol_skew = pd.concat(vol_skew_list, ignore_index=True) # Concatenate the results from all portfolios.
-
-# print("Volatility and Skewness for Each Portfolio:")
-
+final_vol_skew = pd.concat(vol_skew_list, ignore_index=True)
 print("Done calculating volatility and skewness.")
 
 # =============================================================================
@@ -345,98 +329,19 @@ final_monthly_df = final_monthly_df.merge(
     final_vol_skew[['eom', 'portfolio', 'volatility', 'skewness']],
     on=['eom', 'portfolio'],
     how='left')
-final_monthly_df.to_csv(os.path.join(data_folder, "preprocessed", "final_monthly_data.csv"), index=False)
 print("Final monthly dataset created.")
 
 
 # =============================================================================
-#                     h.  Obtaining average values 
+#                h.  Obtaining average and median values 
 # =============================================================================
 print("Obtaining average values for each bond portfolio...")
 average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
-average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
+average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics_warga.csv"), index=False)
 print("Average metrics per bond portfolio:")
 print(average_metrics)
 
 median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
+average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "median_metrics_warga.csv"), index=False)
 print("Median metrics per bond portfolio:")
 print(median_metrics)
-
-# # =============================================================================
-# #               i. Checking the accuracy of the CGO calculations 
-# # =============================================================================
-
-# # -------------------------------
-# # 1. Descriptive Statistics
-# # -------------------------------
-# # print("Summary Statistics for Capital Gain Overhang:")
-# # print(model_data['cap_gain_overhang'].describe())
-# # print("Median Capital Gain Overhang:", model_data['cap_gain_overhang'].median())
-
-# # -------------------------------
-# # 2. Distribution Visualization
-# # -------------------------------
-# cmap = cm.get_cmap('GnBu', 5).reversed()
-# model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
-# model_data_cgo['eom'] = pd.to_datetime(model_data_cgo['eom'])
-
-# # Histogram with KDE to inspect the overall distribution
-# plt.figure(figsize=(10, 6))
-# # We can pick a single color from the colormap, e.g. cmap(1)
-# sns.histplot(
-#     model_data_cgo['cap_gain_overhang'].dropna(),
-#     bins=50,
-#     kde=True,
-#     color=cmap(1)  # Using one color from the reversed colormap
-# )
-# plt.xlabel('Capital Gain Overhang (%)')
-# plt.title('Distribution of Capital Gain Overhang (using price_eom_start)')
-# plt.tight_layout()
-# plt.savefig(os.path.join(figures_folder, "cgo_distribution.png"))
-# plt.close()
-
-# # Boxplot by Portfolio to see differences across portfolios
-# unique_portfolios = sorted(model_data_cgo['portfolio'].dropna().unique())
-# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
-
-# plt.figure(figsize=(10, 6))
-# sns.boxplot(
-#     data=model_data_cgo,
-#     x='portfolio',
-#     y='cap_gain_overhang',
-#     order=unique_portfolios,       # ensure consistent order
-#     palette=palette_colors         # use our custom palette
-# )
-# plt.title('Capital Gain Overhang by Portfolio')
-# plt.xlabel('Portfolio')
-# plt.ylabel('Capital Gain Overhang (%)')
-# plt.tight_layout()
-# plt.savefig(os.path.join(figures_folder, "cgo_boxplot_by_portfolio.png"))
-# plt.close()
-
-# # -------------------------------
-# # 3. Time Series Visualization
-# # -------------------------------
-
-# # Calculate the average capital gain overhang for each month and portfolio.
-# portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
-# unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
-# palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
-
-# plt.figure(figsize=(12, 6))
-# for i, portfolio in enumerate(unique_portfolios):
-#     sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
-#     plt.plot(
-#         sub_df['eom'], sub_df['cap_gain_overhang'],
-#         marker='o',
-#         label=portfolio,
-#         color=palette_colors[i]
-#     )
-# plt.xlabel('Date (eom)')
-# plt.ylabel('Average Capital Gain Overhang (%)')
-# plt.title('Monthly Average Capital Gain Overhang by Portfolio')
-# plt.xticks(rotation=45)
-# plt.legend()
-# plt.tight_layout()
-# plt.savefig(os.path.join(figures_folder, "monthly_cgo_by_portfolio.png"))
-# plt.close()

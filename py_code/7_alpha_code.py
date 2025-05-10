@@ -1,3 +1,15 @@
+# ====================================================================================
+#
+#                 Part 7: Estimating the empirical alpha spread
+#
+#              (Considers only subset including the cleaned data)
+#
+# =====================================================================================
+
+# ===================================================================    
+#             a. Importing libraries, data and packages  
+# ===================================================================
+
 import os
 import statsmodels.formula.api as smf
 import pandas as pd
@@ -9,17 +21,17 @@ fred = Fred(api_key='01b2825140d39531d70a035eaf06853d')
 import statsmodels.api as sm
 from datetime import datetime
 
-#Set the working directory
+# Set the working directory
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
 
-### Getting data
+# Loading data
 model_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
 stock_returns = pd.read_csv(data_folder + "/raw/stock_market_returns.csv")
 long_term_gvt_bond_data = pd.read_csv(data_folder + "/raw/long_term_gvt_bond_data.csv")
 t1m_daily = fred.get_series('DGS1MO') / 100  # Convert from % to decimal
 
-### Creating portfolios
+# Creating portfolios
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 unique_months = model_data['eom'].unique()
@@ -30,6 +42,10 @@ model_data['portfolio'] = np.nan
 model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
+
+# =====================================================================================    
+#          a1. Splitting DI into DI_low and DI_high (not part of initial analysis) 
+# =====================================================================================
 
 # # Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-10)
 # for month in unique_months:
@@ -47,7 +63,11 @@ model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_star
 #         model_data.loc[high_indices, 'portfolio'] = 'DI_high'
 #         model_data.loc[low_indices, 'portfolio'] = 'DI_low'
 
-### Calculating returns for portfolios
+# =====================================================================================    
+#                b. Calculate empirical returns for portfolios 
+# =====================================================================================
+
+# Calculating returns for portfolios
 groups = model_data['portfolio'].dropna().unique().tolist()
 
 # Initialize storage for returns
@@ -104,7 +124,7 @@ for dt in dates:
         weighted_return_all = 0
     market_ret_texc.append(weighted_return_all)
 
-### Creating term variable
+# Creating term variable
 long_term_gvt_bond_data = long_term_gvt_bond_data[['QTDATE', 'TOTRET']]
 long_term_gvt_bond_data.columns = ['date', 'gvt_ret']
 long_term_gvt_bond_data['gvt_ret'] = long_term_gvt_bond_data['gvt_ret'] / 100
@@ -118,15 +138,11 @@ long_term_gvt_bond_data = long_term_gvt_bond_data.loc[
     (long_term_gvt_bond_data['date'] >= '2002-08-31') &
     (long_term_gvt_bond_data['date'] <= '2024-07-31')
 ]
-
-# Set 'date' as index for merging
 long_term_gvt_bond_data = long_term_gvt_bond_data.set_index('date')
 
 # Pull T-bill rate (1-month) from FRED and resample to monthly
 t1m_daily = t1m_daily.ffill()  # Forward fill missing values
-
-# Resample to month-end
-t1m_monthly = t1m_daily.resample('M').last()
+t1m_monthly = t1m_daily.resample('M').last() # Resample to month-end
 
 # Convert to compounded monthly return and shift
 monthly_t1m_monthly = (1 + t1m_monthly) ** (1 / 12) - 1
@@ -137,8 +153,6 @@ monthly_rf.index = pd.to_datetime(monthly_rf.index)
 
 # Merge on the index (Date)
 term_returns = long_term_gvt_bond_data.join(monthly_rf, how='inner')
-
-# Reset index so date becomes a column again
 term_returns = term_returns.reset_index()
 term_returns.rename(columns={'index': 'date'}, inplace=True)
 
@@ -149,6 +163,9 @@ term_returns['term'] = term_returns['gvt_ret'] - term_returns['1m_risk_free']
 term_returns['date'] = pd.to_datetime(term_returns['date']).dt.normalize()
 term_returns.set_index('date', inplace=True)
 
+# =====================================================================================    
+#                c. Create stock market variable
+# =====================================================================================
 ### Creating stock market variable
 stock_returns = stock_returns.iloc[:, :2].rename(columns={
     'caldt': 'date',
@@ -174,11 +191,15 @@ texc_returns_df.index.name = 'date'
 texc_regression_df = texc_returns_df.iloc[:]
 #texc_regression_df = texc_regression_df * 12
 
+# =====================================================================================    
+#                d. Run CAPM regression using ret_texc (one-factor model)
+# =====================================================================================
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(texc_regression_df[['market_ret_texc']])
 
 # Store results in a dictionary
 texc_regression_results = {}
+
 
 # Loop through each portfolio and run the regression
 for portfolio in groups: 
@@ -196,6 +217,9 @@ exc_returns_df = exc_returns_df.join(stock_returns[['stock_ret_exc']], how='left
 exc_regression_df = exc_returns_df.iloc[:]
 #exc_regression_df = exc_regression_df * 12
 
+# =====================================================================================    
+#                d. Run CAPM regression using ret_texc (two-factor model)
+# =====================================================================================
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term']])
 
@@ -211,6 +235,9 @@ for portfolio in groups:
 
 # print(texc_regression_df)
 
+# =====================================================================================    
+#                e. Calculate sharpe ratios and cumulative returns
+# =====================================================================================
 # # Shape ratios
 # print(exc_regression_df.tail())
 # print(texc_regression_df.tail())
@@ -236,8 +263,10 @@ for portfolio in groups:
 # print(f"Cumulative pure credit market return: {cum_return:.4%}")
 # print(f"Annualized pure credit market return: {annualized_return:.4%}")
 
-### Using methods of Avramov et al. (2022) to calculate the alpha
-### Calculating returns for portfolios
+# =====================================================================================    
+#                d. Using methods of Avramov et al. (2022) to calculate the alpha
+# =====================================================================================
+# Calculating returns for portfolios
 
 #model_data = model_data[model_data['ret'].abs() < 0.2]
 
@@ -319,7 +348,9 @@ for portfolio in groups:
     avramov_regression_results[portfolio] = model
     print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
 
-### Testing the alpha spread
+# =====================================================================================    
+#              d1. Testing the alpha spread from Avramov et al. (2022) method
+# =====================================================================================
 
 # Extract constants and standard errors
 alpha_IG = avramov_regression_results['IG'].params['const']

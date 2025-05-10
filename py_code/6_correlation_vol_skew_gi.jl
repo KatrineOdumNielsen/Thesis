@@ -1,15 +1,14 @@
-# ======================================================================================================================
-#                           Replicate Barberis, Jin, and Wang (2021)
-#                              Part 3d: computing expected returns
+# ====================================================================================
 #
-#                                       Author: Gen Li
-#                                         03/14/2021
+#    Part 6: Estimating the correlation between volatility, skewness and gain overhang
 #
-#   Note: I run Part 1 on Google Datalab from Google Cloud Platform (GCP). It takes around 1.5h to finish part 1 with
-#         32-core CPU and parallel computation.
+#              (Considers only subset including the cleaned data)
 #
-#
-# ======================================================================================================================
+# =====================================================================================
+
+# ===================================================================    
+#                 a. set up Julia and download packages   
+# ===================================================================
 ENV["JULIA_SSL_CA_ROOTS_PATH"] = ""
 ENV["SSL_CERT_FILE"] = ""
 
@@ -67,27 +66,16 @@ using GLPK
 Plots.showtheme(:vibrant)
 theme(:bright)
 
-### Our parameters ###
+# ===================================================================    
+#                      b. Load data
+# ===================================================================
 theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
 average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
 
-#%% Draw figure 2
-# pyplot()
-# Plots.PyPlotBackend()
-# l = @layout [a  b; c]
-
-
-# p2 = plot!(momr_param_all.avg_std, momr_param_all.avg_gi, linetype=:scatter ,markershape=:star5, markersize=10,leg = false, dpi=300)
-# xlabel!("standard deviation", xguidefontsize=10)
-# ylabel!("gain overhang", yguidefontsize=10)
-# p3 = plot(momr_param_all.avg_skew, momr_param_all.avg_gi, linetype=:scatter ,markershape=:star5, markersize=10,leg = false, dpi=300)
-# xlabel!("skewness", xguidefontsize=10)
-# ylabel!("gain overhang", yguidefontsize=10)
-# plot(p1, p2, p3, layout = l)
-
-# title!("Objective function of Equation 20", titlefontsize=10)
-# gr()
-# Plots.GRBackend()
+# ===================================================================    
+#            c. Plotting correlation figures
+# ===================================================================
+# Correlation figure between volatility and skewness
 pyplot()
 Plots.PyPlotBackend()
 labels = ["DI", "HY", "IG"]
@@ -96,15 +84,15 @@ plot(average_metrics_updated.volatility, average_metrics_updated.skewness, marke
     markershape=:octagon, markersize=11,leg = false, dpi=300)
 xlabel!("standard deviation", xguidefontsize=12)
 ylabel!("skewness", yguidefontsize=12)
-for (xi, yi, lab) in zip(x, y, labels)
+for (xi, yi, lab) in zip(average_metrics_updated.volatility, average_metrics_updated.skewness, labels)
     annotate!(
-      xi, yi + 0.05,                    # shift label 0.02 up
-      text(lab, 10, halign = :center)    # font size 8, centered
+      xi, yi + 0.05,
+      text(lab, 10, halign = :center)
     )
 end
-savefig(joinpath("figures", "Figure2a.png"))
+savefig(joinpath("figures", "correlation_vol_skew.png"))
 
-
+# Correlation figure between volatility and gain overhang
 pyplot()
 Plots.PyPlotBackend()
 labels = ["DI", "HY", "IG"]
@@ -121,8 +109,9 @@ for (xi, yi, lab) in zip(
     xi, yi + 1,
     text(lab, 10, halign = :center))
 end
-savefig(joinpath("figures", "Figure2b.png"))
+savefig(joinpath("figures", "correlation_vol_CGO.png"))
 
+# Correlation figure between skewness and gain overhang
 pyplot()
 Plots.PyPlotBackend()
 labels = ["DI", "HY", "IG"]
@@ -141,6 +130,6 @@ for (xi, yi, lab) in zip(
     text(lab, 10, halign = :center)
   )
 end
-savefig(joinpath("figures", "Figure2c.png"))
+savefig(joinpath("figures", "correlation_skew_CGO.png"))
 
 print("Done")
