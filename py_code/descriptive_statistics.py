@@ -35,7 +35,7 @@ bond_data_large['eom'] = pd.to_datetime(bond_data_large['eom'])
 bond_data['eom'] = pd.to_datetime(bond_data['eom'])
 bond_warga_data['eom'] = pd.to_datetime(bond_warga_data['eom'])
 
-model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date', 'distressed_rating_start']]
+model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date', 'distressed_rating_start', 'amount_outstanding']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe

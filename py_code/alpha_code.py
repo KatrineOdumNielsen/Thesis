@@ -26,26 +26,26 @@ unique_months = model_data['eom'].unique()
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
-model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
-#model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
+#model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+model_data.loc[model_data['distressed_rating_start'] == True , 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
 
-# Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-10)
-for month in unique_months:
-    # Filter for DI bonds in the current month
-    di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
-    di_bonds = model_data.loc[di_mask]
+# # Split DI into DI_low and DI_high based on cap_gain_overhang_start threshold (-10)
+# for month in unique_months:
+#     # Filter for DI bonds in the current month
+#     di_mask = (model_data['eom'] == month) & (model_data['portfolio'] == 'DI')
+#     di_bonds = model_data.loc[di_mask]
     
-    if len(di_bonds) > 0:
-        # Assign DI_high to bonds with cap_gain_overhang_start > -10
-        high_indices = di_bonds[di_bonds['cap_gain_overhang_start'] > -10]  .index
+#     if len(di_bonds) > 0:
+#         # Assign DI_high to bonds with cap_gain_overhang_start > -10
+#         high_indices = di_bonds[di_bonds['cap_gain_overhang_start'] > -10]  .index
         
-        # Assign DI_low to bonds with cap_gain_overhang_start <= -10
-        low_indices = di_bonds[di_bonds['cap_gain_overhang_start'] <= -10].index
+#         # Assign DI_low to bonds with cap_gain_overhang_start <= -10
+#         low_indices = di_bonds[di_bonds['cap_gain_overhang_start'] <= -10].index
         
-        model_data.loc[high_indices, 'portfolio'] = 'DI_high'
-        model_data.loc[low_indices, 'portfolio'] = 'DI_low'
+#         model_data.loc[high_indices, 'portfolio'] = 'DI_high'
+#         model_data.loc[low_indices, 'portfolio'] = 'DI_low'
 
 ### Calculating returns for portfolios
 groups = model_data['portfolio'].dropna().unique().tolist()
@@ -95,8 +95,7 @@ for dt in dates:
 
         group_ret_exc[grp].append(weighted_return_exc)
 
-
-    # Total market return across all portfolios (optional, but common)
+    # Total market return across all portfolios
     total_mv_all = current_period['market_value_start'].sum()
     if total_mv_all > 0:
         weights_all = current_period['market_value_start'] / total_mv_all
@@ -197,20 +196,20 @@ exc_returns_df = exc_returns_df.join(stock_returns[['stock_ret_exc']], how='left
 exc_regression_df = exc_returns_df.iloc[:]
 #exc_regression_df = exc_regression_df * 12
 
-# # Define the independent variable (market excess return) and add a constant
-# X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term', 'stock_ret_exc']])
+# Define the independent variable (market excess return) and add a constant
+X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term']])
 
-# # Store results in a dictionary
-# exc_regression_results = {}
+# Store results in a dictionary
+exc_regression_results = {}
 
-# # Loop through each portfolio and run the regression
-# for portfolio in groups: 
-#     y = exc_regression_df[portfolio]
-#     model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
-#     exc_regression_results[portfolio] = model
-#     print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
+# Loop through each portfolio and run the regression
+for portfolio in groups: 
+    y = exc_regression_df[portfolio]
+    model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
+    exc_regression_results[portfolio] = model
+    print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
 
-print(texc_regression_df)
+# print(texc_regression_df)
 
 # # Shape ratios
 # print(exc_regression_df.tail())
@@ -225,14 +224,123 @@ print(texc_regression_df)
 # print("Standard deviation of excess return:\n" + exc_returns_std.to_string())
 # print("Sharpe ratio:\n" + exc_returns_sharpe.to_string())
 
-# Cumulative return
-cum_return = (1 + texc_regression_df['DI_high']).prod() - 1
+# # Cumulative return
+# cum_return = (1 + texc_regression_df['DI']).prod() - 1
 
-# Number of months
-n_months = texc_regression_df.shape[0]
+# # Number of months
+# n_months = texc_regression_df.shape[0]
 
-# Annualized return
-annualized_return = (1 + cum_return) ** (12 / n_months) - 1
+# # Annualized return
+# annualized_return = (1 + cum_return) ** (12 / n_months) - 1
 
-print(f"Cumulative pure credit market return: {cum_return:.4%}")
-print(f"Annualized pure credit market return: {annualized_return:.4%}")
+# print(f"Cumulative pure credit market return: {cum_return:.4%}")
+# print(f"Annualized pure credit market return: {annualized_return:.4%}")
+
+### Using methods of Avramov et al. (2022) to calculate the alpha
+### Calculating returns for portfolios
+
+#model_data = model_data[model_data['ret'].abs() < 0.2]
+
+groups = model_data['portfolio'].dropna().unique().tolist()
+
+# Initialize storage for returns
+group_ret_exc_avramov = {grp: [] for grp in groups}
+market_ret_exc_avramov = []
+date_series = []
+
+# Get list of unique month-end dates
+dates = sorted(model_data['eom'].dropna().unique())
+
+# Loop through each month
+for dt in dates:
+    current_period = model_data[model_data['eom'] == dt]
+
+    # Skip if no data
+    if current_period.empty:
+        continue
+
+    date_series.append(dt)
+
+    # Compute returns (texc) for each group
+    for grp in groups:
+        group_data = current_period[current_period['portfolio'] == grp]
+        total_mv = group_data['market_value_start'].sum()
+
+        if len(group_data) > 0 and total_mv > 0:
+            weights = group_data['market_value_start'] / total_mv
+            weighted_return = (weights * group_data['ret_exc']).sum()
+        else:
+            weighted_return = 0
+
+        group_ret_exc_avramov[grp].append(weighted_return)
+
+    # Total market return across all portfolios
+    total_mv_all = current_period['amount_outstanding'].sum()
+    if total_mv_all > 0:
+        weights_all = current_period['amount_outstanding'] / total_mv_all
+        weighted_return_all = (weights_all * current_period['ret_exc']).sum()
+    else:
+        weighted_return_all = 0
+    market_ret_exc_avramov.append(weighted_return_all)
+
+
+# Import data on size of US bond and US stock markets
+stock_size = fred.get_series('BOGZ1LM883164105Q') 
+bond_size = fred.get_series('ASCFBL') 
+
+# Convert to monthly frequency and forward fill missing values
+stock_size = stock_size.resample('M').last().ffill()
+bond_size = bond_size.resample('M').last().ffill()
+stock_size = stock_size.loc['2002-08-30':'2024-07-31']
+bond_size = bond_size.loc['2002-08-30':'2024-07-31']
+
+# Calculate weights
+stock_weight = stock_size / (stock_size + bond_size)
+bond_weight = bond_size / (stock_size + bond_size)
+
+# Construct market return
+bond_market_ret_exc_series_avramov = pd.Series(market_ret_exc_avramov, index=pd.to_datetime(date_series))
+market_return = (stock_weight * stock_returns['stock_ret_exc']) + (bond_weight * bond_market_ret_exc_series_avramov)
+
+# Collecting into a single dataframe
+returns_arvamov_df = pd.DataFrame(group_ret_exc_avramov, index=pd.to_datetime(date_series))
+returns_arvamov_df['market_ret_exc'] = market_return
+
+# Define the independent variable (market excess return) and add a constant
+X = sm.add_constant(returns_arvamov_df[['market_ret_exc']])
+
+# Store results in a dictionary
+avramov_regression_results = {}
+
+# Loop through each portfolio and run the regression
+for portfolio in groups: 
+    y = returns_arvamov_df[portfolio]
+    model = sm.OLS(y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 4})
+    avramov_regression_results[portfolio] = model
+    print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
+
+### Testing the alpha spread
+
+# Extract constants and standard errors
+alpha_IG = avramov_regression_results['IG'].params['const']
+alpha_DI = avramov_regression_results['DI'].params['const']
+
+se_IG = avramov_regression_results['IG'].bse['const']
+se_DI = avramov_regression_results['DI'].bse['const']
+
+# Difference in constants
+delta = alpha_IG - alpha_DI
+se_delta = (se_IG**2 + se_DI**2)**0.5
+t_stat = delta / se_delta
+
+# Degrees of freedom (approximate)
+df = min(avramov_regression_results['IG'].df_resid, avramov_regression_results['DI'].df_resid)
+
+# p-value (two-tailed test)
+from scipy import stats
+p_value = 2 * stats.t.sf(abs(t_stat), df)
+
+print(f"Difference in constants (alpha_IG - alpha_DI): {delta:.6f}")
+print(f"Standard error of the difference: {se_delta:.6f}")
+print(f"t-statistic: {t_stat:.3f}")
+print(f"p-value: {p_value:.4f}")
