@@ -23,8 +23,8 @@ figures_folder = project_dir + "/figures"
 bond_data = pd.read_csv("data/preprocessed/bond_data.csv")
 bond_data_large = pd.read_csv("data/preprocessed/bond_data_large.csv")
 bond_warga_data = pd.read_csv("data/preprocessed/bond_warga_data.csv")
-bond_data_large_warga = pd.read_csv("data/preprocessed/bond_data_large_warga.csv")
-bond_data_large_warga['eom'] = pd.to_datetime(bond_data_large_warga['eom'])
+avramov_dataset = pd.read_csv("data/preprocessed/avramov_dataset.csv")
+avramov_dataset['eom'] = pd.to_datetime(avramov_dataset['eom'])
 bond_data_large['eom'] = pd.to_datetime(bond_data_large['eom'])
 bond_data['eom'] = pd.to_datetime(bond_data['eom'])
 bond_warga_data['eom'] = pd.to_datetime(bond_warga_data['eom'])
@@ -72,7 +72,7 @@ descriptive_variables_warga = ['size', 'ret', 'market_value_start', 'maturity_ye
 print("summary stats for warga:", bond_warga_data[descriptive_variables_warga].describe(include='all'))
 
 # Full dataset including Warga, clean data, and WRDS
-print("summary stats including warga:", bond_data_large_warga[descriptive_variables_warga].describe(include='all'))
+print("summary stats including avramov_dataset:", avramov_dataset[descriptive_variables_warga].describe(include='all'))
 
 # Average bond size across all bonds
 grouped = bond_data.groupby('cusip')
@@ -283,7 +283,7 @@ for dt in dates_large:
 
         if len(group_data) > 0 and total_mv > 0:
             weights = group_data['market_value_start'] / total_mv
-            weighted_return = (weights * group_data['ret']).sum() 
+            weighted_return = (weights * group_data['ret']).sum()
         else:
             weighted_return = 0
 

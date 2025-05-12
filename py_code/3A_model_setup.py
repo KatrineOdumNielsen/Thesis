@@ -27,6 +27,8 @@ model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 
+cmap = cm.get_cmap('GnBu', 5).reversed()
+
 # ===================================================================    
 #                     a. Set up portfolios by month        
 # ===================================================================
@@ -179,23 +181,6 @@ beta_df = pd.DataFrame(beta_records)
 
 print("Done calculating rolling betas")
 
-# Plot the Rolling Betas for Each Portfolio
-cmap = cm.get_cmap('GnBu', 5).reversed()
-
-plt.figure(figsize=(10, 6))
-for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
-    sub_df = beta_df[beta_df['portfolio'] == portfolio]
-    plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
-plt.xlabel("End-of-Month (eom)")
-plt.ylabel("Rolling Beta")
-plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
-plt.legend()
-plt.xticks(rotation=45)
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(figures_folder + "/rolling_beta_by_portfolio.png")
-plt.close()
-
 # ===================================================================    
 #           e.  Calculate capital gain overhang  (CGO)      
 # ===================================================================   
@@ -277,7 +262,9 @@ print("Done calculating capital gain overhang (CGO).")
 print("Calculating volatility and skewness...")
 model_data = model_data.sort_values(['cusip', 'eom'])
 
-#model_data['ret_texc'] = model_data['ret_exc']
+# Use when comparing to Avramov data
+# model_data['ret_texc'] = model_data['ret_exc']
+
 model_data['log_texc'] = np.log(1 + model_data['ret_texc'])
 
 def compute_annual_return(bond_df):
@@ -342,6 +329,7 @@ print("Average metrics per bond portfolio:")
 print(average_metrics)
 
 median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
+#median_metrics.to_csv(os.path.join(data_folder, "preprocessed", "median_metrics.csv"), index=False)
 print("Median metrics per bond portfolio:")
 print(median_metrics)
 
@@ -353,19 +341,22 @@ model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
 portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
 unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
 palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
+portfolio_cgo['eom'] = pd.to_datetime(portfolio_cgo['eom'])
+
+earliest_date = portfolio_cgo['eom'].min()
+portfolio_cgo = portfolio_cgo[portfolio_cgo['eom'] > earliest_date]
 
 plt.figure(figsize=(12, 6))
 for i, portfolio in enumerate(unique_portfolios):
     sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
     plt.plot(
         sub_df['eom'], sub_df['cap_gain_overhang'],
-        marker='o',
         label=portfolio,
         color=palette_colors[i]
     )
 plt.xlabel('Date (eom)')
 plt.ylabel('Average Capital Gain Overhang (%)')
-plt.title('Monthly Average Capital Gain Overhang by Portfolio')
+plt.title('Monthly Average Capital Gain Overhang by Group')
 plt.xticks(rotation=45)
 plt.legend()
 plt.tight_layout()

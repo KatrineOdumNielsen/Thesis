@@ -1,8 +1,8 @@
 # =============================================================================
 #
-#                     Part 4B: Finding S_i and zeta_i
+#                     Part 4C: Finding S_i and zeta_i
 #
-#    (Considers cleaned data, but splits distressed by high and low CGO)
+#           (Considers only subset including Warga data)
 #
 # =============================================================================
 
@@ -19,9 +19,8 @@ import matplotlib.pyplot as plt
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
-final_monthly_data = pd.read_csv(data_folder + "/preprocessed/final_monthly_data_split.csv")
-model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo_split.csv")
-average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics_split.csv")
+model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_avramov.csv")
+average_metrics = pd.read_csv(data_folder + "/preprocessed/median_metrics_avramov.csv")
 
 # ===================================================================    
 #                     a. Set up known parameters        
@@ -30,54 +29,49 @@ nu = 17
 Rf = 1
 
 # To find theta, we need to know the average number of bonds in our datasat as well as the average proportions of each portfolio of bonds.
-monthly_total = model_data_cgo.groupby('eom').size().reset_index(name='total_bonds')
-avg_bonds = monthly_total['total_bonds'].mean()
+monthly_total = model_data_cgo.groupby('eom').size().reset_index(name='total_bonds') 
+avg_bonds = monthly_total['total_bonds'].mean() 
 print("Average number of bonds per month:", avg_bonds)
-monthly_portfolio = (model_data_cgo.groupby(['eom', 'portfolio']).size().reset_index(name='portfolio_count'))
-monthly_portfolio = monthly_portfolio.merge(monthly_total, on='eom')
-monthly_portfolio['proportion'] = monthly_portfolio['portfolio_count'] / monthly_portfolio['total_bonds']
-avg_portfolio_props = monthly_portfolio.groupby('portfolio')['proportion'].mean().reset_index()
-print("\nAverage proportions across all months:")
+monthly_portfolio = (model_data_cgo.groupby(['eom', 'portfolio']).size().reset_index(name='portfolio_count')) 
+monthly_portfolio = monthly_portfolio.merge(monthly_total, on='eom') 
+monthly_portfolio['proportion'] = monthly_portfolio['portfolio_count'] / monthly_portfolio['total_bonds'] 
+avg_portfolio_props = monthly_portfolio.groupby('portfolio')['proportion'].mean().reset_index() 
 print(avg_portfolio_props)
 
 #Rounds the average proportions to even numbers
 N = 1000
-pr_DI_low = 20
-pr_DI_high = 20
-pr_HY = 180
+pr_DI = 30
+pr_HY = 190
 pr_IG = 780
 
 # For each month and portfolio, sum the market_value_past
 monthly_mv = (model_data_cgo.groupby(['eom', 'portfolio'])['market_value_start'].sum().reset_index()) 
 overall_monthly = (model_data_cgo.groupby('eom')['market_value_start'].sum().reset_index()) 
 avg_portfolio_mv = monthly_mv.groupby('portfolio')['market_value_start'].mean().reset_index() 
-overall_avg_mv = overall_monthly['market_value_start'].mean() 
+overall_avg_mv = overall_monthly['market_value_start'].mean()
 avg_portfolio_mv['weight'] = avg_portfolio_mv['market_value_start'] / overall_avg_mv
-weight_DI_high = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'DI_high', 'weight'].values[0] #Assigns the weight of DI_high
-weight_DI_low = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'DI_low', 'weight'].values[0] #Assigns the weight of DI_low
+weight_DI = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'DI', 'weight'].values[0] #Assigns the weight of DI
 weight_HY = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'HY', 'weight'].values[0] #Assigns the weight of HY
 weight_IG = avg_portfolio_mv.loc[avg_portfolio_mv['portfolio'] == 'IG', 'weight'].values[0] #Assigns the weight of IG
 print("Average monthly portfolio market values and weights:")
 print(avg_portfolio_mv)
 
 # Compute theta for each portfolio as the ratio of the computed weight to the target value
-theta_mi_DI_high = weight_DI_high / pr_DI_high
-theta_mi_DI_low = weight_DI_low / pr_DI_low
+theta_mi_DI = weight_DI / pr_DI
 theta_mi_HY = weight_HY / pr_HY
 theta_mi_IG = weight_IG / pr_IG
-print("Theta_DI_high:", theta_mi_DI_high)
-print("Theta_DI_low:", theta_mi_DI_low)
+print("Theta_DI:", theta_mi_DI)
 print("Theta_HY:", theta_mi_HY)
 print("Theta_IG:", theta_mi_IG)
 
 # Making thetas into a dataframe for later use
-portfolios = ['DI_high', 'DI_low', 'HY', 'IG']
-theta_values = [theta_mi_DI_high, theta_mi_DI_low, theta_mi_HY, theta_mi_IG]
+portfolios = ['DI', 'HY', 'IG']
+theta_values = [theta_mi_DI, theta_mi_HY, theta_mi_IG]
 thetas_df = pd.DataFrame({'portfolio': portfolios,'theta_mi': theta_values})
 thetas_df['theta_i_minus1'] = thetas_df['theta_mi']
 # print("thetas_df DataFrame:")
 # print(thetas_df)
-thetas_df.to_csv(data_folder + '/preprocessed/thetas_df_split.csv')
+thetas_df.to_csv(data_folder + '/preprocessed/thetas_df_avramov.csv')
 
 # =========================================================================================
 #                                    Calculating S and zeta
@@ -119,13 +113,12 @@ for index, row in average_metrics.iterrows():
     Si_values.append(Si)
     zeta_values.append(zeta)
 
-# Add the new columns to the dataframe
 average_metrics["Si"] = Si_values
 average_metrics["zeta"] = zeta_values
 
 # Create the updated dataframe
 average_metrics_updated = average_metrics.copy()
 print(average_metrics_updated)
-average_metrics_updated.to_csv(data_folder + '/preprocessed/average_metrics_split_updated.csv', index=False)
+average_metrics_updated.to_csv(data_folder + '/preprocessed/median_metrics_updated_avramov.csv', index=False)
 
 print("Average metrics updated with Si and zeta values")

@@ -6,7 +6,7 @@
 #
 # =====================================================================================
 
-run_title = "title_of_run" 
+run_title = "run_title" 
 
 # ===================================================================    
 #                 a. set up Julia and download packages   
@@ -87,8 +87,8 @@ alpha, delta, lambda = (0.7, 0.65, 1.5)
 Ri = 0.01
 mu = 0.005
 
-theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
-average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
+theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df_avramov.csv")))
+average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "median_metrics_updated_avramov.csv")))
 
 sigma_all = average_metrics_updated.volatility
 beta_all = average_metrics_updated.beta
@@ -106,7 +106,7 @@ theta_high = zeros(3,1)
 theta_low = zeros(3,1)
 x = ones(3,1)              # fraction of investors with low holding (only relevant for hetro equilibrium)
 y = zeros(3,1)             # fraction of investors with high holding (only relevant for hetro equilibrium)
-bound = [20,20,2.5]        # list for bounds of integrals
+bound = [20,20,5]        # list for bounds of integrals
 
 # ===================================================================    
 #         c. define functions, solve for mu_hat and optimize theta 

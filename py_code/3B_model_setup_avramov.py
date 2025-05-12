@@ -22,11 +22,12 @@ data_folder = project_dir + "/data"
 figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
-bond_data = pd.read_csv(data_folder + "/preprocessed/bond_warga_data.csv")
+bond_data = pd.read_csv(data_folder + "/preprocessed/avramov_dataset.csv")
 model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 
+cmap = cm.get_cmap('GnBu', 5).reversed()
 
 # ===================================================================    
 #                     a. Set up portfolios by month        
@@ -43,13 +44,14 @@ for month in sorted(unique_months):
     month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
     month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
     month_data.loc[month_data['portfolio'].isnull(), 'portfolio'] = 'Other'
-    portfolio_by_month[month] = month_data # Save the DataFrame for this month
+    portfolio_by_month[month] = month_data
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
+model_data.to_csv("data/preprocessed/model_data_avramov.csv")
 print("Done setting up portfolios")
 
 # print("Portfolio counts:")
@@ -136,66 +138,49 @@ market_return_df = long_returns[['eom', 'market_return']]
 print("Done calculating monthly market weighted returns.")
 
 # ===================================================================    
-#           d.   Compute rolling betas for each portfolio        
+#           d.   Compute rolling betas for each portfolio  (not used for avramov dataset)      
 # ===================================================================  
-print("Calculating rolling betas...")
-def compute_beta(window_df, min_months=12):
-    """Compute beta as:
-         beta = Cov(portfolio returns, market returns) / Var(market returns)
-    If there are fewer than min_months observations or if the market variance is zero,
-    return np.nan.
-    """
-    pr = window_df['weighted_return'].values
-    mr = window_df['market_return'].values
-    if len(mr) < min_months or np.var(mr, ddof=1) == 0:
-        return np.nan
-    cov = np.cov(pr, mr, ddof=1)[0, 1]
-    var_market = np.var(mr, ddof=1)
-    return cov / var_market
+# print("Calculating rolling betas...")
+# def compute_beta(window_df, min_months=12):
+#     """Compute beta as:
+#          beta = Cov(portfolio returns, market returns) / Var(market returns)
+#     If there are fewer than min_months observations or if the market variance is zero,
+#     return np.nan.
+#     """
+#     pr = window_df['weighted_return'].values
+#     mr = window_df['market_return'].values
+#     if len(mr) < min_months or np.var(mr, ddof=1) == 0:
+#         return np.nan
+#     cov = np.cov(pr, mr, ddof=1)[0, 1]
+#     var_market = np.var(mr, ddof=1)
+#     return cov / var_market
 
-# Loop over each portfolio and each month to calculate beta
-beta_records = []
-returns_merged = returns_merged.sort_values('eom')
-for portfolio in returns_merged['portfolio'].unique():
-    df_port = returns_merged[returns_merged['portfolio'] == portfolio].copy().sort_values('eom').reset_index(drop=True)
-    for i, current_date in enumerate(df_port['eom']):
-        if i < 12:     # Skip the first 12 months (no full 12-month history available).
-            continue
-        if i < 60:     # For months 13 up to 60, use all available historical months.
-            window_df = df_port.iloc[0:i]
-        else:          # For month 61 and later, use only the previous 60 months.
-            window_df = df_port.iloc[i-60:i]
-        n_months = len(window_df)
-        beta_val = compute_beta(window_df, min_months=12)
-        beta_records.append({
-            'portfolio': portfolio,
-            'eom': current_date,
-            'beta': beta_val,
-            'n_months': n_months
-        })
+# # Loop over each portfolio and each month to calculate beta
+# beta_records = []
+# returns_merged = returns_merged.sort_values('eom')
+# for portfolio in returns_merged['portfolio'].unique():
+#     df_port = returns_merged[returns_merged['portfolio'] == portfolio].copy().sort_values('eom').reset_index(drop=True)
+#     for i, current_date in enumerate(df_port['eom']):
+#         if i < 12:     # Skip the first 12 months (no full 12-month history available).
+#             continue
+#         if i < 60:     # For months 13 up to 60, use all available historical months.
+#             window_df = df_port.iloc[0:i]
+#         else:          # For month 61 and later, use only the previous 60 months.
+#             window_df = df_port.iloc[i-60:i]
+#         n_months = len(window_df)
+#         beta_val = compute_beta(window_df, min_months=12)
+#         beta_records.append({
+#             'portfolio': portfolio,
+#             'eom': current_date,
+#             'beta': beta_val,
+#             'n_months': n_months
+#         })
 
-beta_df = pd.DataFrame(beta_records)
-# print("Rolling Beta DataFrame (variable window up to 60 months):")
-# print(beta_df)
+# beta_df = pd.DataFrame(beta_records)
+# # print("Rolling Beta DataFrame (variable window up to 60 months):")
+# # print(beta_df)
 
-print("Done calculating rolling betas")
-
-# Plot the Rolling Betas for Each Portfolio
-# cmap = cm.get_cmap('GnBu', 5).reversed()
-
-# plt.figure(figsize=(10, 6))
-# for i, portfolio in enumerate(sorted(beta_df['portfolio'].unique())):
-#     sub_df = beta_df[beta_df['portfolio'] == portfolio]
-#     plt.plot(sub_df['eom'], sub_df['beta'], marker='o', label=portfolio, color=cmap(i+1))
-# plt.xlabel("End-of-Month (eom)")
-# plt.ylabel("Rolling Beta")
-# plt.title("Rolling Beta by Portfolio Over Time\n(Beta computed using past data: increasing from 12 to 60 months)")
-# plt.legend()
-# plt.xticks(rotation=45)
-# plt.grid(True)
-# plt.tight_layout()
-# plt.savefig(figures_folder + "/rolling_beta_by_portfolio_warga.png")
-# plt.close()
+# print("Done calculating rolling betas")
 
 # ===================================================================    
 #           e.  Calculate capital gain overhang  (CGO)      
@@ -320,8 +305,8 @@ print("Done calculating volatility and skewness.")
 # =============================================================================
 print("Merging all datasets to one final dataset...")
 final_monthly_df = monthly_port_ret_long.copy()
-final_monthly_df = final_monthly_df.merge(beta_df[['eom', 'portfolio', 'beta']],
-                                          on=['eom', 'portfolio'], how='left')
+# final_monthly_df = final_monthly_df.merge(beta_df[['eom', 'portfolio', 'beta']],
+#                                          on=['eom', 'portfolio'], how='left')
 final_monthly_df = final_monthly_df.merge(monthly_cgo[['eom', 'portfolio', 'cap_gain_overhang']],
                                           on=['eom', 'portfolio'], how='left')
 final_monthly_df = final_monthly_df.merge(market_return_df, on='eom', how='left')
@@ -335,13 +320,13 @@ print("Final monthly dataset created.")
 # =============================================================================
 #                h.  Obtaining average and median values 
 # =============================================================================
-print("Obtaining average values for each bond portfolio...")
-average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
-average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics_warga.csv"), index=False)
-print("Average metrics per bond portfolio:")
-print(average_metrics)
+median_metrics = final_monthly_df.groupby("portfolio")[["cap_gain_overhang", "volatility", "skewness"]].median()
 
-median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
-average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "median_metrics_warga.csv"), index=False)
+# add betas from average_metrics from clean dataset
+average_metrics_clean = pd.read_csv(data_folder + "/preprocessed/average_metrics.csv")
+betas = average_metrics_clean["beta"]
+median_metrics.insert(0, "beta", betas.values)
+
+median_metrics.to_csv(os.path.join(data_folder, "preprocessed", "median_metrics_avramov.csv"), index=False)
 print("Median metrics per bond portfolio:")
 print(median_metrics)

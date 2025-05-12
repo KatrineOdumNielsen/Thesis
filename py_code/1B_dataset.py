@@ -196,13 +196,13 @@ bond_data = bond_data_large[bond_data_large['eom'] <= '2021-11-30']
 # Load warga data
 bond_warga_data = pd.read_csv(data_folder + "/preprocessed/bond_warga_data.csv")
 bond_warga_data['eom'] = pd.to_datetime(bond_warga_data['eom'])
-all_cols = sorted(set(bond_warga_data.columns) | set(bond_data_large.columns))
-bond_data_large_warga = pd.concat([
+all_cols = sorted(set(bond_warga_data.columns) | set(bond_data.columns))
+avramov_dataset = pd.concat([
     bond_warga_data.reindex(columns=all_cols),
-    bond_data_large.reindex(columns=all_cols)],
+    bond_data.reindex(columns=all_cols)],
     ignore_index=True,
     sort=False)
-bond_data_large_warga = bond_data_large_warga.sort_values(['cusip','eom']).reset_index(drop=True)
+avramov_dataset = avramov_dataset.sort_values(['cusip','eom']).reset_index(drop=True)
 new_order = ['eom', 'cusip', 'market_value', 'ret_exc','ret_texc','yield',
                                    't_bill_1','ret','security_level','size','amount_outstanding',
                                    'coupon','rating_num','rating_class','warga_yield','wrds_yield',
@@ -211,7 +211,11 @@ new_order = ['eom', 'cusip', 'market_value', 'ret_exc','ret_texc','yield',
                                    'rating_class_start','price_eom_start','prior_eom',
                                    'credit_spread_start','market_value_start','distressed_rating',
                                    'distressed_rating_start','distressed_spread','distressed_spread_start']
-bond_data_large_warga = bond_data_large_warga[new_order]
+avramov_dataset = avramov_dataset[new_order]
+avramov_dataset = avramov_dataset[
+    (avramov_dataset['eom'] >= '1986-01-31') &
+    (avramov_dataset['eom'] <= '2016-12-31')
+] # Capping dataset to match Avramov's dataset
 
 # ================  Calculating CGO in order to split the dataset on CGO  ================
 #Calculating capital gain overhang for bond_data
@@ -293,6 +297,6 @@ bond_data = pd.merge(
 # ================  Save the data  ================
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
-bond_data_large_warga.to_csv("data/preprocessed/bond_data_large_warga.csv")
+avramov_dataset.to_csv("data/preprocessed/avramov_dataset.csv")
 
 print("done")
