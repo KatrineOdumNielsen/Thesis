@@ -24,5 +24,5 @@ source venv/bin/activate
 # Install dependencies from requirements.txt
 pip install -r requirements.txt
 
-# Now run your Python script
+# Now run your Python script 
 python replica_code2.jl

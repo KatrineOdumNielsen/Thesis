@@ -87,8 +87,8 @@ alpha, delta, lambda = (0.7, 0.65, 1.5)
 Ri = 0.01
 mu = 0.005
 
-theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df_ccc.csv")))
-average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated_ccc.csv")))
+theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df.csv")))
+average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated.csv")))
 
 sigma_all = average_metrics_updated.volatility
 beta_all = average_metrics_updated.beta
@@ -106,12 +106,12 @@ theta_high = zeros(3,1)
 theta_low = zeros(3,1)
 x = ones(3,1)              # fraction of investors with low holding (only relevant for hetro equilibrium)
 y = zeros(3,1)             # fraction of investors with high holding (only relevant for hetro equilibrium)
-bound = [20,20,5]        # list for bounds of integrals
+bound = [20,20,5]          # list for bounds of integrals
 
 # ===================================================================    
 #         c. define functions, solve for mu_hat and optimize theta 
 # ===================================================================
-for j = 1:3
+for j = 3:3
     println("I am calculating mu_hat and theta_i_hat for portfolio ",j)
 
     L_bound = -bound[j]
@@ -299,30 +299,30 @@ for j = 1:3
             return -(term1 + term2 + term3)
         end
         
-        # #theta_i_rand = LinRange(0.00001,0.002,50)
-        # theta_i_rand = LinRange(0.00001,0.005,100)
-        # u_rand = Equation20.(theta_i_rand,mu_hat[j])
+        #theta_i_rand = LinRange(0.00001,0.002,50)
+        theta_i_rand = LinRange(0.00001,0.005,100)
+        u_rand = Equation20.(theta_i_rand,mu_hat[j])
 
-        # #theta_i_rand_neg = LinRange(-0.001,-0.00001,50)
-        # theta_i_rand_neg = LinRange(-0.0025,-0.00001,100)
-        # u_rand_neg = Equation20.(theta_i_rand_neg,mu_hat[j])
+        #theta_i_rand_neg = LinRange(-0.001,-0.00001,50)
+        theta_i_rand_neg = LinRange(-0.0025,-0.00001,100)
+        u_rand_neg = Equation20.(theta_i_rand_neg,mu_hat[j])
 
-        # theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
-        # u_rand_all = [u_rand_neg; u_rand]
+        theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
+        u_rand_all = [u_rand_neg; u_rand]
 
-        # # Store utility values
+        # Store utility values
         theta_low[j] = theta_i_hat[j]
 
-        # # Plotting graphs
-        # pyplot()
-        # Plots.PyPlotBackend()
-        # plot(theta_i_rand_all, -u_rand_all, w=3, leg = false, color=:darkblue, dpi=300, xlims = (-0.0015, 0.003), ylims = (-0.0007, -0.0003))
-        # xlabel!("θ", xguidefontsize=10)
-        # ylabel!("utility", yguidefontsize=10)
-        # title!("Objective Function for DI Bonds", titlefontsize=10)
-        # savefig(joinpath("figures","homogeneous_equi_portfolio_$(j).png"))
+        # Plotting graphs
+        pyplot()
+        Plots.PyPlotBackend()
+        plot(theta_i_rand_all, -u_rand_all, w=3, leg = false, color=:darkblue, dpi=300, xlims = (-0.0015, 0.003), ylims = (-0.0007, -0.0003))
+        xlabel!("θ", xguidefontsize=10)
+        ylabel!("utility", yguidefontsize=10)
+        title!("Objective Function for DI Bonds", titlefontsize=10)
+        savefig(joinpath("figures","homogeneous_equi_portfolio_$(j).png"))
 
-        # println("done with plot for portfolio $j")
+        println("done with plot for portfolio $j")
 
         function Equation20_MV_homogeneous(theta_i,mu_hat)
 
@@ -345,7 +345,7 @@ for j = 1:3
     elseif abs(theta_i_hat[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(mu_hat[j]-0.02,mu_hat[j]+0.01,75)
+        μ_pot = LinRange(mu_hat[j]-0.025,mu_hat[j],100)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -439,31 +439,31 @@ for j = 1:3
         
         hetro_mu = mu_hat[j]
 
-        # theta_i_rand = LinRange(0.0005,0.4,100)
-        # u_rand = Equation20.(theta_i_rand,hetro_mu)
-        # MV_rand = Equation20_MV.(theta_i_rand,hetro_mu)
-        # PT_rand = Equation20_PT.(theta_i_rand,hetro_mu)
+        theta_i_rand = LinRange(0.0005,0.4,100)
+        u_rand = Equation20.(theta_i_rand,hetro_mu)
+        MV_rand = Equation20_MV.(theta_i_rand,hetro_mu)
+        PT_rand = Equation20_PT.(theta_i_rand,hetro_mu)
 
-        # theta_i_rand_neg = LinRange(-0.1,-0.001,50)
-        # u_rand_neg = Equation20.(theta_i_rand_neg,hetro_mu)
-        # MV_rand_neg = Equation20_MV.(theta_i_rand_neg,hetro_mu)
-        # PT_rand_neg = Equation20_PT.(theta_i_rand_neg,hetro_mu)
+        theta_i_rand_neg = LinRange(-0.1,-0.001,50)
+        u_rand_neg = Equation20.(theta_i_rand_neg,hetro_mu)
+        MV_rand_neg = Equation20_MV.(theta_i_rand_neg,hetro_mu)
+        PT_rand_neg = Equation20_PT.(theta_i_rand_neg,hetro_mu)
 
-        # theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
-        # u_rand_all = [u_rand_neg; u_rand]
-        # MV_rand_all = [MV_rand_neg; MV_rand]
-        # PT_rand_all = [PT_rand_neg; PT_rand]
+        theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
+        u_rand_all = [u_rand_neg; u_rand]
+        MV_rand_all = [MV_rand_neg; MV_rand]
+        PT_rand_all = [PT_rand_neg; PT_rand]
 
-        # # Plotting graphs
-        # pyplot()
-        # Plots.PyPlotBackend()
-        # plot(theta_i_rand_all, -u_rand_all, w=2,xlims=(-0.02,0.25), ylims=(-0.001,0.001) ,color=:darkblue, leg = false, dpi=300)
-        # plot!(theta_i_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.02,0.25), ylims=(-0.001,0.001) , color=:lightgreen ,leg = false, dpi=300)
-        # plot!(theta_i_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.02,0.25), ylims=(-0.001,0.001) , color=:lightseagreen, leg = false, dpi=300)
-        # xlabel!("θ", xguidefontsize=10)
-        # ylabel!("utility", yguidefontsize=10)
-        # title!("Objective Function for HY Bonds", titlefontsize=10) # change to the name of the portfolio
-        # savefig(joinpath("figures", "heterogeneous_equi_portfolio_$(j).png"))
+        # Plotting graphs
+        pyplot()
+        Plots.PyPlotBackend()
+        plot(theta_i_rand_all, -u_rand_all, w=2,xlims=(-0.02,0.35), ylims=(-0.001,0.001) ,color=:darkblue, leg = false, dpi=300)
+        plot!(theta_i_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.02,0.35), ylims=(-0.001,0.001) , color=:lightgreen ,leg = false, dpi=300)
+        plot!(theta_i_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.02,0.35), ylims=(-0.001,0.001) , color=:lightseagreen, leg = false, dpi=300)
+        xlabel!("θ", xguidefontsize=10)
+        ylabel!("utility", yguidefontsize=10)
+        title!("Objective Function for HY Bonds", titlefontsize=10) # change to the name of the portfolio
+        savefig(joinpath("figures", "heterogeneous_equi_portfolio_$(j).png"))
 
     end
     exp_exc_ret[j] = mu_hat[j] + (nu * zetai)/(nu-2) - Rf
@@ -493,58 +493,58 @@ println("Total execution time: $elapsed_time")
 
 # ===================================================================    
 #                e. save each run (optional)
-# ===================================================================
-timestamp = Dates.now()
+# # ===================================================================
+# timestamp = Dates.now()
 
-# flatten vectors into scalars
-mu1, mu2, mu3             = mu_hat[1], mu_hat[2], mu_hat[3]
-theta1, theta2, theta3    = theta_i_hat[1], theta_i_hat[2], theta_i_hat[3]
-exp1, exp2, exp3          = exp_exc_ret[1], exp_exc_ret[2], exp_exc_ret[3]
-mkt_ret                   = market_return
-alpha1, alpha2, alpha3    = capm_alpha[1], capm_alpha[2], capm_alpha[3]
-bound_di, bound_hy, bound_ig = bound[1], bound[2], bound[3]
+# # flatten vectors into scalars
+# mu1, mu2, mu3             = mu_hat[1], mu_hat[2], mu_hat[3]
+# theta1, theta2, theta3    = theta_i_hat[1], theta_i_hat[2], theta_i_hat[3]
+# exp1, exp2, exp3          = exp_exc_ret[1], exp_exc_ret[2], exp_exc_ret[3]
+# mkt_ret                   = market_return
+# alpha1, alpha2, alpha3    = capm_alpha[1], capm_alpha[2], capm_alpha[3]
+# bound_di, bound_hy, bound_ig = bound[1], bound[2], bound[3]
 
-# collect all the parameters
-log_row = DataFrame(
-  timestamp      = timestamp,
-  run_title      = run_title,
-  nu             = nu,
-  sigma_m        = sigma_m,
-  Rf             = Rf,
-  gamma_hat      = gamma_hat,
-  b0             = b0,
-  alpha_param    = alpha,
-  delta          = delta,
-  lambda         = lambda,
-  Ri             = Ri,
-  mu             = mu,
-  bound_di       = bound_di,
-  bound_hy       = bound_hy,
-  bound_ig       = bound_ig,
-  mu1            = mu1,
-  mu2            = mu2,
-  mu3            = mu3,
-  theta1         = theta1,
-  theta2         = theta2,
-  theta3         = theta3,
-  exp_exc1       = exp1,
-  exp_exc2       = exp2,
-  exp_exc3       = exp3,
-  market_return  = mkt_ret,
-  alpha1         = alpha1,
-  alpha2         = alpha2,
-  alpha3         = alpha3
-)
+# # collect all the parameters
+# log_row = DataFrame(
+#   timestamp      = timestamp,
+#   run_title      = run_title,
+#   nu             = nu,
+#   sigma_m        = sigma_m,
+#   Rf             = Rf,
+#   gamma_hat      = gamma_hat,
+#   b0             = b0,
+#   alpha_param    = alpha,
+#   delta          = delta,
+#   lambda         = lambda,
+#   Ri             = Ri,
+#   mu             = mu,
+#   bound_di       = bound_di,
+#   bound_hy       = bound_hy,
+#   bound_ig       = bound_ig,
+#   mu1            = mu1,
+#   mu2            = mu2,
+#   mu3            = mu3,
+#   theta1         = theta1,
+#   theta2         = theta2,
+#   theta3         = theta3,
+#   exp_exc1       = exp1,
+#   exp_exc2       = exp2,
+#   exp_exc3       = exp3,
+#   market_return  = mkt_ret,
+#   alpha1         = alpha1,
+#   alpha2         = alpha2,
+#   alpha3         = alpha3
+# )
 
-first_avg = average_metrics_updated[1:1, :] #extract the first row of average_metrics_updated
-log_row_full = hcat(log_row, first_avg)
+# first_avg = average_metrics_updated[1:1, :] #extract the first row of average_metrics_updated
+# log_row_full = hcat(log_row, first_avg)
 
-results_dir = joinpath(project_folder, "data", "results")
-log_file = joinpath(results_dir, "run_log.csv")
-CSV.write(
-  log_file,
-  log_row_full;
-  append = isfile(log_file),
-)
+# results_dir = joinpath(project_folder, "data", "results")
+# log_file = joinpath(results_dir, "run_log.csv")
+# CSV.write(
+#   log_file,
+#   log_row_full;
+#   append = isfile(log_file),
+# )
 
-println("Logged this run to $log_file")
+# println("Logged this run to $log_file")

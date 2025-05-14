@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 #Set up working directory
 project_dir = os.getcwd()   # Change to your project directory
 data_folder = project_dir + "/data"
-model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo_ccc.csv")
-average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics_ccc.csv")
+model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
+average_metrics = pd.read_csv(data_folder + "/preprocessed/average_metrics.csv")
 
 # ===================================================================    
 #                     a. Set up known parameters        
@@ -71,7 +71,7 @@ thetas_df = pd.DataFrame({'portfolio': portfolios,'theta_mi': theta_values})
 thetas_df['theta_i_minus1'] = thetas_df['theta_mi']
 # print("thetas_df DataFrame:")
 # print(thetas_df)
-thetas_df.to_csv(data_folder + '/preprocessed/thetas_df_ccc.csv')
+thetas_df.to_csv(data_folder + '/preprocessed/thetas_df.csv')
 
 # =========================================================================================
 #                                    Calculating S and zeta
@@ -119,6 +119,6 @@ average_metrics["zeta"] = zeta_values
 # Create the updated dataframe
 average_metrics_updated = average_metrics.copy()
 print(average_metrics_updated)
-average_metrics_updated.to_csv(data_folder + '/preprocessed/average_metrics_updated_ccc.csv', index=False)
+average_metrics_updated.to_csv(data_folder + '/preprocessed/average_metrics_updated.csv', index=False)
 
 print("Average metrics updated with Si and zeta values")
