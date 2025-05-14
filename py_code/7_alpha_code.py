@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from fredapi import Fred
-fred = Fred(api_key='01b2825140d39531d70a035eaf06853d')
+fred = Fred(api_key='insert_your_api_key_here')  # Insert FRED API key here
 import statsmodels.api as sm
 from datetime import datetime
 
