@@ -6,5 +6,4 @@
 ### 2_descriptive_statistics.py
 ### etc.
 
-## Note that to retrieve specific results that are specified in the paper, some manual 
-## changes must be made. These changes are thoroughly described in the paper.
+## Note that to retrieve specific results that are specified in the paper, some manual changes must be made. These changes are thoroughly described in the paper.
