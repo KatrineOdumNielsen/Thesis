@@ -170,8 +170,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Datafiles
-data/
-
 #Extra
 .DS_Store
+
+# Datafiles
+data/
