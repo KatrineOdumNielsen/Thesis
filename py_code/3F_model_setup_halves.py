@@ -3,7 +3,7 @@
 #                         Part 3A: Model Setup
 #    (Calculating Beta, Capital Gain overhang, volatility, and skewness)
 #
-#         (Considers only subset including the cleaned data)
+#         (Considers only subset including the cleaned data, halves the data)
 #
 # =============================================================================
 import pandas as pd
@@ -22,8 +22,9 @@ data_folder = project_dir + "/data"
 figures_folder = project_dir + "/figures"
 
 # Importing the cleaned data
-bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data.csv")
-model_data = pd.read_csv(data_folder + "/preprocessed/model_data.csv")
+bond_data = pd.read_csv(data_folder + "/preprocessed/bond_data_second_half.csv")
+
+model_data = bond_data[['eom', 'cusip', 'ret', 'ret_exc', 'ret_texc', 'credit_spread_start', 'rating_class_start', 'market_value_start', 'price_eom', 'price_eom_start', 'offering_date', 'distressed_rating_start', 'amount_outstanding']]
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 
@@ -34,13 +35,24 @@ cmap = cm.get_cmap('GnBu', 5).reversed()
 # ===================================================================
 print("Setting up portfolios by month...")                                                         
 bond_data['eom'] = pd.to_datetime(model_data['eom'])
+unique_months = model_data['eom'].unique()
+portfolio_by_month = {}
+
+for month in sorted(unique_months):
+    month_data = model_data[model_data['eom'] == month].copy()
+    # Assign portfolios for this month based on credit spread and rating class
+    month_data.loc[month_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
+    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
+    month_data.loc[(month_data['portfolio'].isnull()) & (month_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
+    month_data.loc[month_data['portfolio'].isnull(), 'portfolio'] = 'Other'
+    portfolio_by_month[month] = month_data
 
 # Add portfolio to the model_data 
 model_data['portfolio'] = np.nan
 model_data.loc[model_data['credit_spread_start'] > 0.1, 'portfolio'] = 'DI'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '0.IG'), 'portfolio'] = 'IG'
 model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_start'] == '1.HY'), 'portfolio'] = 'HY'
-model_data.to_csv("data/preprocessed/model_data.csv")
+#model_data.to_csv("data/preprocessed/model_data.csv")
 print("Done setting up portfolios")
 
 # print("Portfolio counts:")
@@ -234,7 +246,7 @@ def compute_effective_purchase_price_exponential(group):
 print('Applying the function group-wise by bond (cusip) ...')
 model_data = model_data.sort_values(['cusip', 'eom'])
 model_data = model_data.groupby('cusip').apply(compute_effective_purchase_price_exponential).reset_index(drop=True)
-model_data.to_csv(os.path.join(data_folder + "/preprocessed/model_data_cgo.csv"), index=False)
+model_data.to_csv(os.path.join(data_folder + "/preprocessed/model_data_cgo_halves2.csv"), index=False)
 
 # Aggregate CGO at portfolio level, first monthly then yearly
 monthly_cgo = (
@@ -253,6 +265,7 @@ model_data = model_data.sort_values(['cusip', 'eom'])
 
 # Use when comparing to Avramov data
 # model_data['ret_texc'] = model_data['ret_exc']
+
 model_data['log_texc'] = np.log(1 + model_data['ret_texc'])
 
 def compute_annual_return(bond_df):
@@ -304,7 +317,6 @@ final_monthly_df = final_monthly_df.merge(
     final_vol_skew[['eom', 'portfolio', 'volatility', 'skewness']],
     on=['eom', 'portfolio'],
     how='left')
-final_monthly_df.to_csv(os.path.join(data_folder, "preprocessed", "final_monthly_data.csv"), index=False)
 print("Final monthly dataset created.")
 
 # =============================================================================
@@ -312,41 +324,6 @@ print("Final monthly dataset created.")
 # =============================================================================
 print("Obtaining average values for each bond portfolio...")
 average_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].mean()
-average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics.csv"), index=False)
+average_metrics.to_csv(os.path.join(data_folder, "preprocessed", "average_metrics_secondhalf.csv"), index=False)
 print("Average metrics per bond portfolio:")
 print(average_metrics)
-
-median_metrics = final_monthly_df.groupby("portfolio")[["beta", "cap_gain_overhang", "volatility", "skewness"]].median()
-#median_metrics.to_csv(os.path.join(data_folder, "preprocessed", "median_metrics.csv"), index=False)
-print("Median metrics per bond portfolio:")
-print(median_metrics)
-
-# ======================================================================================
-#       i. Checking the accuracy of the CGO calculations (Time Series Visualization)
-# ======================================================================================
-# Calculate the average capital gain overhang for each month and portfolio.
-model_data_cgo = pd.read_csv(data_folder + "/preprocessed/model_data_cgo.csv")
-portfolio_cgo = model_data_cgo.groupby(['eom', 'portfolio'])['cap_gain_overhang'].mean().reset_index()
-unique_portfolios = sorted(portfolio_cgo['portfolio'].dropna().unique())
-palette_colors = [cmap(i+1) for i in range(len(unique_portfolios))]
-portfolio_cgo['eom'] = pd.to_datetime(portfolio_cgo['eom'])
-
-earliest_date = portfolio_cgo['eom'].min()
-portfolio_cgo = portfolio_cgo[portfolio_cgo['eom'] > earliest_date]
-
-plt.figure(figsize=(12, 6))
-for i, portfolio in enumerate(unique_portfolios):
-    sub_df = portfolio_cgo[portfolio_cgo['portfolio'] == portfolio]
-    plt.plot(
-        sub_df['eom'], sub_df['cap_gain_overhang'],
-        label=portfolio,
-        color=palette_colors[i]
-    )
-plt.xlabel('Date (eom)')
-plt.ylabel('Average Capital Gain Overhang (%)')
-plt.title('Monthly Average Capital Gain Overhang by Group')
-plt.xticks(rotation=45)
-plt.legend()
-plt.tight_layout()
-plt.savefig(os.path.join(figures_folder, "monthly_cgo_by_portfolio.png"))
-plt.close()

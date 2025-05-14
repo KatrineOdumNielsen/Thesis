@@ -293,8 +293,16 @@ bond_data = pd.merge(
     on=['cusip', 'eom'],
     how='left'
 )
+# ================  Split bond data in two samples  ================
+bond_data['eom'] = pd.to_datetime(bond_data['eom'])
+bond_data = bond_data.sort_values('eom').reset_index(drop=True)
+mid_row   = len(bond_data) // 2
+first_half  = bond_data.iloc[:mid_row]
+second_half = bond_data.iloc[mid_row:]
 
 # ================  Save the data  ================
+first_half.to_csv("data/preprocessed/bond_data_first_half.csv")
+second_half.to_csv("data/preprocessed/bond_data_second_half.csv")
 bond_data.to_csv("data/preprocessed/bond_data.csv")
 bond_data_large.to_csv("data/preprocessed/bond_data_large.csv")
 avramov_dataset.to_csv("data/preprocessed/avramov_dataset.csv")

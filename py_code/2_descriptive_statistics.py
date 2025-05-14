@@ -34,7 +34,7 @@ model_data['eom'] = pd.to_datetime(model_data['eom'])
 model_data['offering_date'] = pd.to_datetime(model_data['offering_date'])
 model_data.to_csv("data/preprocessed/model_data.csv") #saving the smaller dataframe
 
-### Creating portfolios
+# Creating portfolios
 model_data['eom'] = pd.to_datetime(model_data['eom'])
 unique_months = model_data['eom'].unique()
 
@@ -51,7 +51,7 @@ model_data.loc[model_data['portfolio'].isnull() & (model_data['rating_class_star
 #Load descriptive statistics
 print("Descriptive statistics:")
 descriptive_variables = ['size', 'ret', 'ret_texc', 'duration', 'market_value_start', 
-                         'maturity_years','credit_spread_start', 'rating_num_start']
+                         'maturity_years','credit_spread_start', 'rating_num_start','amount_outstanding']
 
 # Descriptive statistics for the clean dataset
 summary_stats = bond_data[descriptive_variables].describe(include='all')

@@ -87,8 +87,8 @@ alpha, delta, lambda = (0.7, 0.65, 1.5)
 Ri = 0.01
 mu = 0.005
 
-theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df_avramov.csv")))
-average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "median_metrics_updated_avramov.csv")))
+theta_all = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "thetas_df_ccc.csv")))
+average_metrics_updated = DataFrame(CSV.File(joinpath(project_folder, "data", "preprocessed", "average_metrics_updated_ccc.csv")))
 
 sigma_all = average_metrics_updated.volatility
 beta_all = average_metrics_updated.beta
@@ -299,30 +299,30 @@ for j = 1:3
             return -(term1 + term2 + term3)
         end
         
-        #theta_i_rand = LinRange(0.00001,0.002,50)
-        theta_i_rand = LinRange(0.00001,0.005,100)
-        u_rand = Equation20.(theta_i_rand,mu_hat[j])
+        # #theta_i_rand = LinRange(0.00001,0.002,50)
+        # theta_i_rand = LinRange(0.00001,0.005,100)
+        # u_rand = Equation20.(theta_i_rand,mu_hat[j])
 
-        #theta_i_rand_neg = LinRange(-0.001,-0.00001,50)
-        theta_i_rand_neg = LinRange(-0.0025,-0.00001,100)
-        u_rand_neg = Equation20.(theta_i_rand_neg,mu_hat[j])
+        # #theta_i_rand_neg = LinRange(-0.001,-0.00001,50)
+        # theta_i_rand_neg = LinRange(-0.0025,-0.00001,100)
+        # u_rand_neg = Equation20.(theta_i_rand_neg,mu_hat[j])
 
-        theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
-        u_rand_all = [u_rand_neg; u_rand]
+        # theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
+        # u_rand_all = [u_rand_neg; u_rand]
 
-        # Store utility values
+        # # Store utility values
         theta_low[j] = theta_i_hat[j]
 
-        # Plotting graphs
-        pyplot()
-        Plots.PyPlotBackend()
-        plot(theta_i_rand_all, -u_rand_all, w=3, leg = false, color=:darkblue, dpi=300, xlims = (-0.0015, 0.003), ylims = (-0.0007, -0.0003))
-        xlabel!("θ", xguidefontsize=10)
-        ylabel!("utility", yguidefontsize=10)
-        title!("Objective function of Equation 23 for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures","homogeneous_equi_portfolio_$(j).png"))
+        # # Plotting graphs
+        # pyplot()
+        # Plots.PyPlotBackend()
+        # plot(theta_i_rand_all, -u_rand_all, w=3, leg = false, color=:darkblue, dpi=300, xlims = (-0.0015, 0.003), ylims = (-0.0007, -0.0003))
+        # xlabel!("θ", xguidefontsize=10)
+        # ylabel!("utility", yguidefontsize=10)
+        # title!("Objective Function for DI Bonds", titlefontsize=10)
+        # savefig(joinpath("figures","homogeneous_equi_portfolio_$(j).png"))
 
-        println("done with plot for portfolio $j")
+        # println("done with plot for portfolio $j")
 
         function Equation20_MV_homogeneous(theta_i,mu_hat)
 
@@ -345,7 +345,7 @@ for j = 1:3
     elseif abs(theta_i_hat[j] - theta_mi) >= 0.00001
         println("$j is a heterogeneous equilibrium")
 
-        μ_pot = LinRange(mu_hat[j]-0.025,mu_hat[j],75)
+        μ_pot = LinRange(mu_hat[j]-0.02,mu_hat[j]+0.01,75)
         using DataFrames, Optim
 
         # Create a DataFrame to store the results
@@ -439,31 +439,31 @@ for j = 1:3
         
         hetro_mu = mu_hat[j]
 
-        theta_i_rand = LinRange(0.0005,0.4,100)
-        u_rand = Equation20.(theta_i_rand,hetro_mu)
-        MV_rand = Equation20_MV.(theta_i_rand,hetro_mu)
-        PT_rand = Equation20_PT.(theta_i_rand,hetro_mu)
+        # theta_i_rand = LinRange(0.0005,0.4,100)
+        # u_rand = Equation20.(theta_i_rand,hetro_mu)
+        # MV_rand = Equation20_MV.(theta_i_rand,hetro_mu)
+        # PT_rand = Equation20_PT.(theta_i_rand,hetro_mu)
 
-        theta_i_rand_neg = LinRange(-0.1,-0.001,50)
-        u_rand_neg = Equation20.(theta_i_rand_neg,hetro_mu)
-        MV_rand_neg = Equation20_MV.(theta_i_rand_neg,hetro_mu)
-        PT_rand_neg = Equation20_PT.(theta_i_rand_neg,hetro_mu)
+        # theta_i_rand_neg = LinRange(-0.1,-0.001,50)
+        # u_rand_neg = Equation20.(theta_i_rand_neg,hetro_mu)
+        # MV_rand_neg = Equation20_MV.(theta_i_rand_neg,hetro_mu)
+        # PT_rand_neg = Equation20_PT.(theta_i_rand_neg,hetro_mu)
 
-        theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
-        u_rand_all = [u_rand_neg; u_rand]
-        MV_rand_all = [MV_rand_neg; MV_rand]
-        PT_rand_all = [PT_rand_neg; PT_rand]
+        # theta_i_rand_all = [theta_i_rand_neg; theta_i_rand]
+        # u_rand_all = [u_rand_neg; u_rand]
+        # MV_rand_all = [MV_rand_neg; MV_rand]
+        # PT_rand_all = [PT_rand_neg; PT_rand]
 
-        # Plotting graphs
-        pyplot()
-        Plots.PyPlotBackend()
-        plot(theta_i_rand_all, -u_rand_all, w=2,xlims=(-0.04,0.35), ylims=(-0.002,0.0015) ,color=:darkblue, leg = false, dpi=300)
-        plot!(theta_i_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.04,0.35), ylims=(-0.002,0.0015) , color=:lightgreen ,leg = false, dpi=300)
-        plot!(theta_i_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.04,0.35), ylims=(-0.002,0.0015) , color=:lightseagreen, leg = false, dpi=300)
-        xlabel!("θ", xguidefontsize=10)
-        ylabel!("utility", yguidefontsize=10)
-        title!("Objective function for portfolio $(j)", titlefontsize=10)
-        savefig(joinpath("figures", "heterogeneous_equi_portfolio_$(j).png"))
+        # # Plotting graphs
+        # pyplot()
+        # Plots.PyPlotBackend()
+        # plot(theta_i_rand_all, -u_rand_all, w=2,xlims=(-0.02,0.25), ylims=(-0.001,0.001) ,color=:darkblue, leg = false, dpi=300)
+        # plot!(theta_i_rand_all, -MV_rand_all, linestyle=:dash, w=1,xlims=(-0.02,0.25), ylims=(-0.001,0.001) , color=:lightgreen ,leg = false, dpi=300)
+        # plot!(theta_i_rand_all, -PT_rand_all, linestyle=:dashdot, w=1,xlims=(-0.02,0.25), ylims=(-0.001,0.001) , color=:lightseagreen, leg = false, dpi=300)
+        # xlabel!("θ", xguidefontsize=10)
+        # ylabel!("utility", yguidefontsize=10)
+        # title!("Objective Function for HY Bonds", titlefontsize=10) # change to the name of the portfolio
+        # savefig(joinpath("figures", "heterogeneous_equi_portfolio_$(j).png"))
 
     end
     exp_exc_ret[j] = mu_hat[j] + (nu * zetai)/(nu-2) - Rf
