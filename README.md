@@ -1,5 +1,5 @@
 # Thesis
-## This repository includes all the files that have been used throughout our thesis.
+## This repository includes all code that is necessary to conduct the analysis and discussion.
 ## The code should be run in the order indicated by the title of the files. That is;
 ### 1A_dataset_warga.py
 ### 1B_dataset.py
