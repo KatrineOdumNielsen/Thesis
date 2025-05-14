@@ -184,6 +184,10 @@ stock_returns['date'] = pd.to_datetime(stock_returns['date']).dt.normalize()
 stock_returns['date'] = pd.to_datetime(stock_returns['date']) + pd.offsets.MonthEnd(0)
 stock_returns.set_index('date', inplace=True)
 
+# =====================================================================================    
+#                d. Run CAPM regression using ret_texc (one-factor model)
+# =====================================================================================
+
 # Collecting into a single dataframe
 texc_returns_df = pd.DataFrame(group_ret_texc, index=pd.to_datetime(date_series))
 texc_returns_df['market_ret_texc'] = market_ret_texc
@@ -191,9 +195,6 @@ texc_returns_df.index.name = 'date'
 texc_regression_df = texc_returns_df.iloc[:]
 #texc_regression_df = texc_regression_df * 12
 
-# =====================================================================================    
-#                d. Run CAPM regression using ret_texc (one-factor model)
-# =====================================================================================
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(texc_regression_df[['market_ret_texc']])
 
@@ -208,6 +209,10 @@ for portfolio in groups:
     texc_regression_results[portfolio] = model
     print(f"Regression results using ret_texc for {portfolio}:\n{model.summary()}\n")
 
+# =====================================================================================    
+#                d. Run CAPM regression using ret_texc (two-factor model)
+# =====================================================================================
+
 # Collecting into a single dataframe
 exc_returns_df = pd.DataFrame(group_ret_exc, index=pd.to_datetime(date_series))
 exc_returns_df['market_ret_texc'] = market_ret_texc
@@ -217,9 +222,6 @@ exc_returns_df = exc_returns_df.join(stock_returns[['stock_ret_exc']], how='left
 exc_regression_df = exc_returns_df.iloc[:]
 #exc_regression_df = exc_regression_df * 12
 
-# =====================================================================================    
-#                d. Run CAPM regression using ret_texc (two-factor model)
-# =====================================================================================
 # Define the independent variable (market excess return) and add a constant
 X = sm.add_constant(exc_regression_df[['market_ret_texc', 'term']])
 
@@ -264,7 +266,7 @@ for portfolio in groups:
 # print(f"Annualized pure credit market return: {annualized_return:.4%}")
 
 # =====================================================================================    
-#                d. Using methods of Avramov et al. (2022) to calculate the alpha
+#                f. Using methods of Avramov et al. (2022) to calculate the alpha
 # =====================================================================================
 # Calculating returns for portfolios
 
@@ -349,7 +351,7 @@ for portfolio in groups:
     print(f"Regression results using ret_exc for {portfolio}:\n{model.summary()}\n")
 
 # =====================================================================================    
-#              d1. Testing the alpha spread from Avramov et al. (2022) method
+#              f1. Testing the alpha spread from Avramov et al. (2022) method
 # =====================================================================================
 
 # Extract constants and standard errors
